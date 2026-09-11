@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load depannage_extras %}
 
-{% block titre %}BT {{ depannage.numero_bt }}{% endblock %}
-{% block titre_page %}Dossier BT {{ depannage.numero_bt }}{% endblock %}
+{% block titre %}{{ depannage.numero_bt }}{% endblock %}
+{% block titre_page %}Dossier {{ depannage.numero_bt }}{% endblock %}
 
 {% block contenu %}
 <div class="fil">
@@ -11,14 +11,14 @@
   {% else %}
     <a href="{% url 'depannages:dossiers_clotures' %}">Dossiers clôturés</a>
   {% endif %}
-  / BT {{ depannage.numero_bt }}
+  / {{ depannage.numero_bt }}
 </div>
 
 <div class="grille {% if depannage.cloture_en_attente %}deux{% endif %}">
   <div>
     <div class="carte" style="margin-bottom:16px">
       <div class="titre">
-        <h2>BT {{ depannage.numero_bt }}</h2>
+        <h2>{{ depannage.numero_bt }}</h2>
         {% if depannage.est_provisoire %}
           <span class="badge {% if depannage.est_shunte %}orange{% else %}rouge{% endif %}">
             {{ depannage.get_categorie_provisoire_display }}
@@ -85,7 +85,7 @@
           {% for photo in photos_ouverture %}
             <figure>
               <a href="{{ photo.image.url }}" data-lightbox="{{ photo.image.url }}"
-                 data-lightbox-legende="{{ photo.get_type_photo_display }} - BT {{ depannage.numero_bt }}">
+                 data-lightbox-legende="{{ photo.get_type_photo_display }} - {{ depannage.numero_bt }}">
                 <img src="{{ photo.image.url }}" alt="{{ photo.get_type_photo_display }}">
               </a>
               <figcaption>

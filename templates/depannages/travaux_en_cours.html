@@ -94,7 +94,7 @@
             </div>
 
             <div class="travail-identite">
-              <div class="bt">BT {{ depannage.numero_bt }}</div>
+              <div class="bt">{{ depannage.numero_bt }}</div>
               {% if user|est_responsable %}
                 {% if depannage.etat_delai == 'BIENTOT' %}
                   <div class="travail-alerte"><span class="ico i-clock" aria-hidden="true"></span> Échéance proche</div>

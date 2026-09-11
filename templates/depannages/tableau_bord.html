@@ -139,7 +139,7 @@
     <div class="corps corps-scroll" style="padding:0">
       {% for depannage in alertes %}
         <div class="ligne-travail" style="border-left-width:4px">
-          <div class="bt">BT {{ depannage.numero_bt }}</div>
+          <div class="bt">{{ depannage.numero_bt }}</div>
           <div>
             <span class="badge {% if depannage.est_shunte %}rouge{% else %}orange{% endif %}">
               {{ depannage.get_categorie_provisoire_display }}

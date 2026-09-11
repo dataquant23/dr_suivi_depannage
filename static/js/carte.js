@@ -49,8 +49,11 @@
     const ouverte = legende.classList.toggle("ouverte");
     boutonLegende.classList.toggle("actif", ouverte);
   });
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap",
+  // tile.openstreetmap.org interdit l'usage en production hors tests/perso
+  // (politique d'usage OSM) : CARTO fournit les mêmes données OSM sans clé API.
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    attribution: "&copy; OpenStreetMap &copy; CARTO",
+    subdomains: "abcd",
     maxZoom: 19,
   }).addTo(carte);
 
@@ -331,7 +334,7 @@
     fiche.innerHTML =
       '<button type="button" class="retour" id="btn-retour-liste">' +
       '<span class="btn-symbol i-fleche-gauche" aria-hidden="true"></span> Retour à la liste</button>' +
-      "<h3>BT " + echapper(point.numero_bt) + "</h3>" +
+      "<h3>" + echapper(point.numero_bt) + "</h3>" +
       '<div class="sous-structure">' + echapper((point.structures || []).join(" + ")) + "</div>" +
       '<span class="badge ' + (point.categorie === "COMPTEUR_SHUNTE" ? "orange" : point.categorie === "SANS_ELECTRICITE" ? "rouge" : "bleu") + '">' +
       echapper(point.categorie_libelle) + "</span> " + retard +
@@ -403,7 +406,7 @@
         '<div class="ligne-point" data-id="' + point.id + '">' +
         '<div class="ligne-point-entete">' +
         '<span class="puce" style="background:' + point.couleur + '"></span>' +
-        "<strong>BT " + echapper(point.numero_bt) + "</strong>" + retard +
+        "<strong>" + echapper(point.numero_bt) + "</strong>" + retard +
         "</div>" +
         '<div class="ligne-point-detail">' + echapper(point.secteur) +
         (point.distance_km !== null ? " &middot; " + point.distance_km + " km" : "") +

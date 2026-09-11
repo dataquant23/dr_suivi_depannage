@@ -181,9 +181,9 @@ def saisie(request):
                 utilisateur=request.user,
             )
             if depannage.est_provisoire:
-                messages.success(request, f"BT {depannage.numero_bt} enregistré.")
+                messages.success(request, f"{depannage.numero_bt} enregistré.")
             else:
-                messages.success(request, f"BT {depannage.numero_bt} enregistré (définitif).")
+                messages.success(request, f"{depannage.numero_bt} enregistré (définitif).")
             return redirect("depannages:detail", pk=depannage.pk)
         messages.error(request, "Le formulaire comporte des erreurs.")
     else:
@@ -299,7 +299,7 @@ def cloturer(request, pk):
             elif depannage.statut == Statut.CLOTURE:
                 messages.success(
                     request,
-                    f"BT {depannage.numero_bt} clôturé. Toutes les structures "
+                    f"{depannage.numero_bt} clôturé. Toutes les structures "
                     "ont traité leur part : le dépannage est définitif.",
                 )
             else:

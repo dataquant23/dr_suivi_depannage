@@ -181,7 +181,7 @@ class Depannage(models.Model):
         ]
 
     def __str__(self):
-        return f"BT {self.numero_bt}"
+        return self.numero_bt
 
     def get_absolute_url(self):
         return reverse("depannages:detail", args=[self.pk])
@@ -552,7 +552,7 @@ class PhotoDepannage(models.Model):
         ordering = ["type_photo", "ajoutee_le"]
 
     def __str__(self):
-        return f"{self.get_type_photo_display()} - BT {self.depannage.numero_bt}"
+        return f"{self.get_type_photo_display()} - {self.depannage.numero_bt}"
 
 
 class HistoriqueStatut(models.Model):

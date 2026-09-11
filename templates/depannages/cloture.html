@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load static depannage_extras %}
 
-{% block titre %}Clôturer BT {{ depannage.numero_bt }}{% endblock %}
-{% block titre_page %}Clôturer BT {{ depannage.numero_bt }}{% endblock %}
+{% block titre %}Clôturer {{ depannage.numero_bt }}{% endblock %}
+{% block titre_page %}Clôturer {{ depannage.numero_bt }}{% endblock %}
 
 {% block contenu %}
 <form method="post" enctype="multipart/form-data" id="form-cloture" novalidate>

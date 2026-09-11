@@ -30,7 +30,7 @@
   </div>
   {% for depannage in depasses %}
     <div class="ligne-travail">
-      <div class="bt">BT {{ depannage.numero_bt }}</div>
+      <div class="bt">{{ depannage.numero_bt }}</div>
       <div>
         <span class="badge {% if depannage.est_shunte %}orange{% else %}rouge{% endif %}">
           {{ depannage.get_categorie_provisoire_display }}
@@ -83,7 +83,7 @@
   </div>
   {% for depannage in proches %}
     <div class="ligne-travail">
-      <div class="bt">BT {{ depannage.numero_bt }}</div>
+      <div class="bt">{{ depannage.numero_bt }}</div>
       <div class="secteur">{{ depannage.secteur.libelle }}</div>
       <div class="temps">
         {{ depannage.heures_ecoulees|floatformat:0 }} h / {{ depannage.delai_applique_heures }} h
