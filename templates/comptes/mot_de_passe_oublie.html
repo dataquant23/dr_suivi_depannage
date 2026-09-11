@@ -1,0 +1,28 @@
+{% extends "comptes/base_auth.html" %}
+
+{% block titre %}Mot de passe oublié{% endblock %}
+{% block entete %}Mot de passe oublié{% endblock %}
+{% block sous_titre %}Recevez un lien de réinitialisation{% endblock %}
+
+{% block contenu %}
+  <p class="aide" style="margin:0 0 16px">
+    Indiquez l'adresse e-mail de votre compte. Si elle est connue, vous
+    recevrez un lien pour choisir un nouveau mot de passe.
+  </p>
+
+  <form method="post" class="formulaire-mot-passe ouvert">
+    {% csrf_token %}
+    <div class="champ">
+      <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+      {{ form.email }}
+      {% if form.email.errors %}
+        <div class="message error" style="margin-top:6px">{{ form.email.errors|join:" " }}</div>
+      {% endif %}
+    </div>
+    <button type="submit" class="btn large">Envoyer le lien</button>
+  </form>
+
+  <div style="margin-top:14px;text-align:center">
+    <a href="{% url 'comptes:connexion' %}" class="aide">Retour à la connexion</a>
+  </div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "comptes/base_auth.html" %}
+
+{% block titre %}Nouveau mot de passe{% endblock %}
+{% block entete %}Nouveau mot de passe{% endblock %}
+{% block sous_titre %}Choisissez votre mot de passe{% endblock %}
+
+{% block contenu %}
+  {% if validlink %}
+    <form method="post" class="formulaire-mot-passe ouvert" autocomplete="off">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="message error">{{ form.non_field_errors|join:" " }}</div>
+      {% endif %}
+
+      {% for champ in form %}
+        <div class="champ">
+          <label for="{{ champ.id_for_label }}">{{ champ.label }}</label>
+          <div class="champ-mot-passe">
+            {{ champ }}
+            <button type="button" class="btn-voir-mot-passe" data-cible="{{ champ.id_for_label }}"
+                    aria-label="Afficher le mot de passe" aria-pressed="false">
+              <span class="ico i-eye" aria-hidden="true"></span>
+            </button>
+          </div>
+          {% if champ.errors %}
+            <div class="message error" style="margin-top:6px">{{ champ.errors|join:" " }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      <div class="aide" style="margin:0 0 14px">
+        Au moins 10 caractères, différent de votre identifiant et pas un mot de
+        passe courant.
+      </div>
+
+      <button type="submit" class="btn large">Enregistrer</button>
+    </form>
+  {% else %}
+    <div class="message error" style="margin:0 0 16px">
+      Ce lien n'est plus valable : il a déjà servi, ou le délai de 2 heures est
+      dépassé.
+    </div>
+    <div style="text-align:center">
+      <a href="{% url 'comptes:mot_de_passe_oublie' %}" class="btn">Demander un nouveau lien</a>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll(".btn-voir-mot-passe").forEach(function (bouton) {
+    bouton.addEventListener("click", function () {
+      var champ = document.getElementById(this.dataset.cible);
+      if (!champ) return;
+      var visible = champ.type === "text";
+      champ.type = visible ? "password" : "text";
+      var icone = this.querySelector(".ico");
+      icone.classList.toggle("i-eye", visible);
+      icone.classList.toggle("i-eye-off", !visible);
+      this.setAttribute("aria-pressed", String(!visible));
+      this.setAttribute("aria-label", visible ? "Afficher le mot de passe" : "Masquer le mot de passe");
+    });
+  });
+</script>
+{% endblock %}

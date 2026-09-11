@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% load depannage_extras %}
+
+{% block titre %}BT {{ depannage.numero_bt }}{% endblock %}
+{% block titre_page %}Dossier BT {{ depannage.numero_bt }}{% endblock %}
+
+{% block contenu %}
+<div class="fil">
+  {% if depannage.cloture_en_attente %}
+    <a href="{% url 'depannages:travaux_en_cours' %}">Travaux en cours</a>
+  {% else %}
+    <a href="{% url 'depannages:dossiers_clotures' %}">Dossiers clôturés</a>
+  {% endif %}
+  / BT {{ depannage.numero_bt }}
+</div>
+
+<div class="grille {% if depannage.cloture_en_attente %}deux{% endif %}">
+  <div>
+    <div class="carte" style="margin-bottom:16px">
+      <div class="titre">
+        <h2>BT {{ depannage.numero_bt }}</h2>
+        {% if depannage.est_provisoire %}
+          <span class="badge {% if depannage.est_shunte %}orange{% else %}rouge{% endif %}">
+            {{ depannage.get_categorie_provisoire_display }}
+          </span>
+        {% else %}
+          <span class="badge vert">Définitif</span>
+        {% endif %}
+        <span class="badge gris">{{ depannage.get_statut_display }}</span>
+      </div>
+      <div class="corps">
+        <dl class="paire">
+          <dt>Secteur</dt><dd>{{ depannage.secteur.libelle|default:"Non rattaché (réseau)" }}</dd>
+          {% if user|est_responsable and depannage.commune %}
+            <dt>Commune</dt>
+            <dd>
+              {{ depannage.commune.nom }}
+              {% if depannage.quartier %}
+                &middot; <strong>{{ depannage.quartier.nom }}</strong>
+              {% endif %}
+              {% if depannage.sous_quartier %}
+                &middot; <strong>{{ depannage.sous_quartier.nom }}</strong>
+              {% endif %}
+            </dd>
+          {% endif %}
+          <dt>Structure</dt><dd>{{ depannage.structure.code }}</dd>
+          <dt>Ouvert par</dt><dd>{{ depannage.cree_par }}</dd>
+          <dt>Date de saisie</dt><dd>{{ depannage.date_saisie|date:"d/m/Y H:i" }}</dd>
+          {% if depannage.adresse_saisie %}
+            <dt>Repérage</dt><dd>{{ depannage.adresse_saisie }}</dd>
+          {% endif %}
+          {% if depannage.a_position %}
+            <dt>Position</dt>
+            <dd>{{ depannage.latitude|floatformat:5 }}, {{ depannage.longitude|floatformat:5 }}</dd>
+          {% endif %}
+          <dt>Équipements</dt>
+          <dd>
+            {% for equipement in depannage.equipements.all %}
+              <span class="badge {% if equipement.structure.type_structure == 'DR' %}bleu{% else %}violet{% endif %}"
+                    style="margin:0 4px 4px 0">
+                {{ equipement.structure.code }} &middot; {{ equipement.libelle }}
+              </span>
+            {% endfor %}
+          </dd>
+          {% if depannage.date_regularisation %}
+            <dt>Clôture le</dt><dd>{{ depannage.date_regularisation|date:"d/m/Y H:i" }}</dd>
+          {% endif %}
+        </dl>
+
+        {% if depannage.commentaire %}
+          <div style="margin-top:16px">
+            <span class="etiquette">Commentaire</span>
+            <div style="background:var(--fond);padding:12px;border-radius:var(--radius-sm);font-size:13.5px">
+              {{ depannage.commentaire|linebreaksbr }}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="carte" style="margin-bottom:16px">
+      <div class="titre"><h2>Pièces de l'ouverture</h2></div>
+      <div class="corps">
+        <div class="galerie">
+          {% for photo in photos_ouverture %}
+            <figure>
+              <a href="{{ photo.image.url }}" data-lightbox="{{ photo.image.url }}"
+                 data-lightbox-legende="{{ photo.get_type_photo_display }} - BT {{ depannage.numero_bt }}">
+                <img src="{{ photo.image.url }}" alt="{{ photo.get_type_photo_display }}">
+              </a>
+              <figcaption>
+                {{ photo.get_type_photo_display }} &middot; {{ photo.get_origine_display }}
+              </figcaption>
+            </figure>
+          {% empty %}
+            <p class="aide">Aucune photo enregistrée à l'ouverture.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    {% for cloture in clotures %}
+      <div class="carte" style="margin-bottom:16px">
+        <div class="titre">
+          <h2>Clôture {{ cloture.structure.code }}</h2>
+          <span class="badge vert">&#10003; {{ cloture.date_cloture|date:"d/m/Y H:i" }}</span>
+        </div>
+        <div class="corps">
+          <dl class="paire" style="margin-bottom:14px">
+            <dt>Clôturé par</dt><dd>{{ cloture.cloture_par }}</dd>
+            {% if cloture.commentaire %}
+              <dt>Commentaire</dt><dd>{{ cloture.commentaire }}</dd>
+            {% endif %}
+          </dl>
+          <div class="galerie">
+            {% for photo in cloture.photos.all %}
+              <figure>
+                <a href="{{ photo.image.url }}" data-lightbox="{{ photo.image.url }}"
+                   data-lightbox-legende="{{ photo.get_type_photo_display }} - Clôture {{ cloture.structure.code }}">
+                  <img src="{{ photo.image.url }}" alt="{{ photo.get_type_photo_display }}">
+                </a>
+                <figcaption>{{ photo.get_type_photo_display }}</figcaption>
+              </figure>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+
+  </div>
+
+  {% if depannage.cloture_en_attente %}
+  <!-- Colonne droite : actions -->
+  <div>
+    <div class="carte" style="margin-bottom:16px">
+      <div class="titre">
+        <h2>Avancement de la clôture</h2>
+        <span class="badge orange">
+          {{ depannage.progression_cloture.0 }} / {{ depannage.progression_cloture.1 }}
+        </span>
+      </div>
+      <div class="corps">
+        {% for structure in depannage.structures_concernees %}
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9">
+            <span class="badge {% if structure.type_structure == 'DR' %}bleu{% else %}violet{% endif %}">
+              {{ structure.code }}
+            </span>
+            <span style="flex:1;font-size:12.5px">{{ structure.code }}</span>
+            {% if depannage|est_cloture_pour:structure %}
+              <span class="badge vert">&#10003; Clôturé</span>
+            {% else %}
+              <span class="badge orange">En attente</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+
+        {% if depannage.est_multi_structure %}
+          <div class="aide" style="margin-top:12px">
+            Dossier multi-structure : il ne passera en définitif que lorsque
+            toutes les parts auront été clôturées.
+          </div>
+        {% endif %}
+
+        {% if peut_cloturer %}
+          <a href="{% url 'depannages:cloturer' depannage.pk %}" class="btn succes"
+             style="width:100%;margin-top:14px">
+            &#10003; Clôturer
+          </a>
+        {% else %}
+          <div class="message info" style="margin:14px 0 0">
+            Les parts restantes relèvent d'un autre périmètre que le vôtre.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

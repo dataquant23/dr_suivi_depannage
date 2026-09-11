@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% load static depannage_extras %}
+
+{% block titre %}Travaux en cours{% endblock %}
+{% block body_class %}page-travaux{% endblock %}
+{% block titre_page %}Travaux en cours{% endblock %}
+{% block titre_icone %}<span class="entete-icone"><span class="ico i-clipboard" aria-hidden="true"></span></span>{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Dossiers à clôturer, triés par urgence.</p>{% endblock %}
+
+{% block contenu %}
+
+<div class="grille kpi kpi-compact" style="margin-bottom:16px">
+  <div class="kpi-tuile vert">
+    <div class="kpi-icone"><span class="ico i-clipboard" aria-hidden="true"></span></div>
+    <div><div class="valeur">{{ total }}</div><div class="libelle">À traiter</div><div class="detail"></div></div>
+  </div>
+  <div class="kpi-tuile orange">
+    <div class="kpi-icone"><span class="ico i-bolt" aria-hidden="true"></span></div>
+    <div><div class="valeur">{{ nb_shuntes }}</div><div class="libelle">Shuntés</div><div class="detail"></div></div>
+  </div>
+  <div class="kpi-tuile rouge">
+    <div class="kpi-icone"><span class="ico i-power" aria-hidden="true"></span></div>
+    <div><div class="valeur">{{ nb_sans_electricite }}</div><div class="libelle">Sans courant</div><div class="detail"></div></div>
+  </div>
+  <div class="kpi-tuile vert">
+    <div class="kpi-icone"><span class="ico i-pin" aria-hidden="true"></span></div>
+    <div><div class="valeur">{{ nb_autres }}</div><div class="libelle">Autres </div><div class="detail"></div></div>
+  </div>
+</div>
+
+<div class="carte filtres-travaux" style="margin-bottom:18px">
+  <div class="corps">
+    <form method="get" class="filtres">
+      <div class="champ">
+        <label for="{{ form.q.id_for_label }}">Recherche par Nº BTA</label>
+        {{ form.q }}
+      </div>
+      <div class="champ">
+        <label for="{{ form.secteur.id_for_label }}">Secteur</label>
+        {{ form.secteur }}
+      </div>
+      <div class="champ">
+        <label for="{{ form.etat.id_for_label }}">Délai</label>
+        {{ form.etat }}
+      </div>
+      <button type="submit" class="btn">Filtrer</button>
+      <a href="{% url 'depannages:travaux_en_cours' %}" class="btn secondaire">Réinitialiser</a>
+      <a href="{% url 'depannages:carte' %}" class="btn secondaire"><span class="btn-symbol i-map" aria-hidden="true"></span> Carte</a>
+    </form>
+  </div>
+</div>
+
+<div class="travaux-page-layout" id="travaux-page-layout">
+  <div class="segments bascule-vue-travaux" id="bascule-vue-travaux">
+    <label>
+      <input type="radio" name="vue-travaux" value="dossiers" checked>
+      <span class="boite">Dossiers à clôturer</span>
+    </label>
+    <label>
+      <input type="radio" name="vue-travaux" value="secteurs">
+      <span class="boite">États par secteur</span>
+    </label>
+  </div>
+
+  <div class="travaux-colonne-principale">
+    <div class="carte travaux-unifies">
+      <div class="titre">
+        <h2>Dossiers à clôturer</h2>
+        <div class="onglets-mini" role="tablist" aria-label="Types de dossiers">
+          <a href="?{% if querystring_sans_categorie %}{{ querystring_sans_categorie }}{% endif %}"
+             class="{% if not categorie_active %}actif{% endif %}">À traiter <span>{{ total }}</span></a>
+          <a href="?{{ querystring_sans_categorie }}{% if querystring_sans_categorie %}&amp;{% endif %}categorie=COMPTEUR_SHUNTE"
+             class="{% if categorie_active == 'COMPTEUR_SHUNTE' %}actif{% endif %}">Shuntés <span>{{ nb_shuntes }}</span></a>
+          <a href="?{{ querystring_sans_categorie }}{% if querystring_sans_categorie %}&amp;{% endif %}categorie=SANS_ELECTRICITE"
+             class="{% if categorie_active == 'SANS_ELECTRICITE' %}actif{% endif %}">Sans courant <span>{{ nb_sans_electricite }}</span></a>
+          <a href="?{{ querystring_sans_categorie }}{% if querystring_sans_categorie %}&amp;{% endif %}categorie=AUTRE_EQUIPEMENT"
+             class="{% if categorie_active == 'AUTRE_EQUIPEMENT' %}actif{% endif %}">Autres <span>{{ nb_autres }}</span></a>
+        </div>
+      </div>
+
+      <div class="corps" style="padding:0">
+        <div class="entete-liste-travaux" aria-hidden="true">
+          <span></span>
+          <span>Dossier</span>
+          <span>Type</span>
+          <span>Structure</span>
+          <span>Actions</span>
+        </div>
+        {% for depannage in depannages %}
+          <div class="ligne-travail ligne-filtrable {% if depannage.etat_delai == 'DEPASSE' %}retard{% elif depannage.est_shunte %}shunte{% endif %}"
+               data-categorie="{{ depannage.categorie_provisoire }}">
+            <div class="ligne-icone-travail">
+              <span class="ico i-clipboard" aria-hidden="true"></span>
+            </div>
+
+            <div class="travail-identite">
+              <div class="bt">BT {{ depannage.numero_bt }}</div>
+              {% if user|est_responsable %}
+                {% if depannage.etat_delai == 'BIENTOT' %}
+                  <div class="travail-alerte"><span class="ico i-clock" aria-hidden="true"></span> Échéance proche</div>
+                {% endif %}
+              {% endif %}
+            </div>
+
+            <div class="travail-type">
+              <span class="badge {% if depannage.est_shunte %}orange{% elif depannage.categorie_provisoire == 'SANS_ELECTRICITE' %}rouge{% else %}bleu{% endif %}">
+                {{ depannage.get_categorie_provisoire_display }}
+              </span>
+              <span class="heures-ecoulees">{{ depannage.heures_ecoulees|jours_heures }}</span>
+            </div>
+
+            <div class="parts-structure">
+              {% for structure in depannage.structures_concernees %}
+                <span class="part {% if depannage|est_cloture_pour:structure %}faite{% else %}attente{% endif %}">
+                  {% if depannage|est_cloture_pour:structure %}&#10003;{% endif %}
+                  {{ structure.code }}
+                </span>
+              {% endfor %}
+            </div>
+
+            <div class="actions">
+              <a href="{{ depannage.get_absolute_url }}" class="btn secondaire petit">
+                <span class="btn-symbol i-eye" aria-hidden="true"></span> Voir
+              </a>
+              {% if depannage.url_maps %}
+                <a href="{{ depannage.url_maps }}" target="_blank" rel="noopener" class="btn secondaire petit">
+                  <span class="btn-symbol i-navigation" aria-hidden="true"></span> Itinéraire
+                </a>
+              {% endif %}
+              {% if user|peut_saisir and depannage|peut_cloturer:user %}
+                <a href="{% url 'depannages:cloturer' depannage.pk %}" class="btn succes petit">
+                  <span class="btn-symbol i-check" aria-hidden="true"></span> Clôturer
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        {% empty %}
+          <div class="vide">
+            <span class="ico">&#10003;</span>
+            Aucun dossier à clôturer pour ce filtre.
+          </div>
+        {% endfor %}
+
+        {% if page_obj.has_other_pages %}
+          <div class="pagination-simple">
+            {% if page_obj.has_previous %}
+              <a class="btn secondaire petit"
+                 href="?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">
+                Préc
+              </a>
+            {% else %}
+              <span class="btn secondaire petit desactive">Préc</span>
+            {% endif %}
+            <span class="pagination-compteur">
+              {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+            </span>
+            {% if page_obj.has_next %}
+              <a class="btn secondaire petit"
+                 href="?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">
+                Suiv
+              </a>
+            {% else %}
+              <span class="btn secondaire petit desactive">Suiv</span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <aside class="carte etats-secteurs">
+    <div class="titre">
+      <h2>États par secteur</h2>
+    </div>
+    <div class="corps">
+      <div class="legende-secteurs">
+        <span><i class="vert"></i> À traiter</span>
+        <span><i class="orange"></i> Shuntés</span>
+        <span><i class="jaune"></i> Sans courant</span>
+        <span><i class="rouge"></i> En retard</span>
+      </div>
+      {% for secteur in etats_secteurs %}
+        <div class="secteur-etat">
+          <div class="secteur-etat-titre">
+            <strong>{{ secteur.libelle }}</strong>
+            <span class="ico i-chevron" aria-hidden="true"></span>
+          </div>
+          <div class="barre-secteur">
+            <span class="seg vert" style="width:{{ secteur.pct_a_traiter }}%"></span>
+            <span class="seg orange" style="width:{{ secteur.pct_shuntes }}%"></span>
+            <span class="seg jaune" style="width:{{ secteur.pct_sans_courant }}%"></span>
+            <span class="seg rouge" style="width:{{ secteur.pct_en_retard }}%"></span>
+          </div>
+          <div class="secteur-chiffres">
+            <span><strong>{{ secteur.a_traiter }}</strong>À traiter</span>
+            <span><strong>{{ secteur.shuntes }}</strong>Shuntés</span>
+            <span><strong>{{ secteur.sans_courant }}</strong>Sans courant</span>
+            <span><strong>{{ secteur.en_retard }}</strong>En retard</span>
+          </div>
+        </div>
+      {% empty %}
+        <p class="aide">Aucun secteur à afficher.</p>
+      {% endfor %}
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/travaux.js' %}"></script>
+{% endblock %}

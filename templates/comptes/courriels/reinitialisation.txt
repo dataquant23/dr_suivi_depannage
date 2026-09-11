@@ -1,0 +1,17 @@
+Bonjour {{ user.get_full_name|default:user.username }},
+
+Une réinitialisation de mot de passe a été demandée pour votre compte
+« {{ user.username }} » sur l'application Gestion des dépannages.
+
+Cliquez sur ce lien pour choisir un nouveau mot de passe :
+{{ protocol }}://{{ domain }}{% url 'comptes:mot_de_passe_reinitialiser' uidb64=uid token=token %}
+
+Ce lien est valable 2 heures et ne peut servir qu'une seule fois.
+
+Si vous n'êtes pas à l'origine de cette demande, ignorez ce message : votre
+mot de passe actuel reste inchangé. Prévenez votre administrateur si cela se
+répète.
+
+--
+Gestion des dépannages - CIE
+Message automatique, merci de ne pas y répondre.

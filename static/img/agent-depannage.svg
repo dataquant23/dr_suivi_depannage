@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="titre desc">
+  <title id="titre">Agent de depannage</title>
+  <desc id="desc">Pictogramme d un agent de depannage electrique avec casque orange et veste verte.</desc>
+  <defs>
+    <linearGradient id="fond" x1="96" y1="54" x2="418" y2="454" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eef8f0"/>
+    </linearGradient>
+    <linearGradient id="bleu" x1="146" y1="126" x2="370" y2="438" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#159d64"/>
+      <stop offset="1" stop-color="#17613e"/>
+    </linearGradient>
+    <linearGradient id="casque" x1="150" y1="104" x2="372" y2="258" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff9f43"/>
+      <stop offset="1" stop-color="#f26322"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="256" cy="256" r="222" fill="url(#fond)"/>
+  <circle cx="256" cy="256" r="221" fill="none" stroke="#d9eddf" stroke-width="4"/>
+
+  <path d="M110 430c21-78 78-122 146-122s125 44 146 122H110Z" fill="url(#bleu)"/>
+  <path d="M161 430c10-47 44-74 95-74s85 27 95 74H161Z" fill="#0b3f2b" opacity=".42"/>
+  <path d="M199 334h114l-32 52h-50l-32-52Z" fill="#f4f8ff"/>
+  <path d="M203 334h106l-53 63-53-63Z" fill="#dceaff"/>
+
+  <path d="M172 241c0-59 36-102 84-102s84 43 84 102v28c0 49-38 89-84 89s-84-40-84-89v-28Z" fill="#ffffff"/>
+  <path d="M172 241c0-59 36-102 84-102s84 43 84 102v28c0 49-38 89-84 89s-84-40-84-89v-28Z" fill="none" stroke="#cbd8d0" stroke-width="8"/>
+  <path d="M188 269c23 20 45 30 68 30s45-10 68-30c-5 43-34 73-68 73s-63-30-68-73Z" fill="#f7faf7"/>
+
+  <path d="M142 236h228c-1-71-50-126-114-126s-113 55-114 126Z" fill="url(#casque)"/>
+  <path d="M177 140c19-19 46-30 79-30s60 11 79 30v96H177v-96Z" fill="#f27622"/>
+  <path d="M249 98h14c7 0 13 6 13 13v96h-40v-96c0-7 6-13 13-13Z" fill="#fff2e7" opacity=".96"/>
+  <path d="M126 231c0-13 11-24 24-24h212c13 0 24 11 24 24v11c0 7-6 13-13 13H139c-7 0-13-6-13-13v-11Z" fill="#dc571c"/>
+
+  <path d="M236 217h50l-37 54h32l-57 75 15-57h-31l28-72Z" fill="#ffffff"/>
+  <path d="M164 418h184" stroke="#78c99f" stroke-width="12" stroke-linecap="round" opacity=".55"/>
+  <path d="M202 430l-16-71" stroke="#a7d7bb" stroke-width="10" stroke-linecap="round"/>
+  <path d="M310 430l16-71" stroke="#a7d7bb" stroke-width="10" stroke-linecap="round"/>
+</svg>

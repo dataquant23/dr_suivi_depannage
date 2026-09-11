@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% load l10n static %}
+
+{% block titre %}Nouvelle saisie{% endblock %}
+{% block body_class %}page-saisie{% endblock %}
+{% block titre_page %}Nouvelle saisie {% endblock %}
+{% block titre_icone %}<span class="entete-icone"><span class="ico i-plus" aria-hidden="true"></span></span>{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Créez rapidement une fiche de dépannage.</p>{% endblock %}
+
+{% block contenu %}
+<form method="post" enctype="multipart/form-data" id="form-saisie" novalidate>
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <div class="message error">{{ form.non_field_errors|join:" " }}</div>
+  {% endif %}
+
+  <div class="grille deux">
+    <div>
+      <!-- Infos essentielles -->
+      <div class="carte" style="margin-bottom:16px">
+        <div class="titre"><h2>Infos essentielles</h2></div>
+        <div class="corps">
+
+          <div class="champ">
+            <label for="{{ form.numero_bt.id_for_label }}">
+              Numéro BTA <span class="obligatoire">*</span>
+            </label>
+            {{ form.numero_bt }}
+            {% for e in form.numero_bt.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="champ">
+            <span class="etiquette">Localisation <span class="obligatoire">*</span></span>
+            <div id="etat-gps" class="message info" style="margin-bottom:8px">
+              <span class="spinner-gps" id="spinner-gps" aria-hidden="true"></span>
+              <span id="texte-etat-gps">Capture de la position en cours...</span>
+            </div>
+            {{ form.latitude }}{{ form.longitude }}{{ form.precision_m }}
+            <div style="display:flex;gap:8px">
+              <button type="button" class="btn secondaire petit" id="btn-gps">
+                <span class="btn-symbol i-map" aria-hidden="true"></span> Recapturer la position
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Type d'intervention -->
+      <div class="carte" style="margin-bottom:16px">
+        <div class="titre"><h2>Type d'intervention</h2></div>
+        <div class="corps">
+          <div class="segments" id="segments-type">
+            {% for choix in form.type_intervention %}
+              <label>
+                {{ choix.tag }}
+                <span class="boite">{{ choix.choice_label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+          {% for e in form.type_intervention.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+
+          <!-- La nature du dossier (shunté / sans électricité / autre) se déduit des équipements cochés -->
+          <input type="hidden" name="categorie_provisoire" id="champ-categorie" value="AUTRE_EQUIPEMENT">
+        </div>
+      </div>
+
+      <!-- Équipements par structure responsable -->
+      <div class="carte">
+        <div class="titre">
+          <h2>Équipements concernés <span class="obligatoire">*</span></h2>
+          
+        </div>
+        <div class="corps">
+          {% for structure, choix_liste in equipements_par_structure.items %}
+            <div class="groupe-structure">
+              <div class="entete-groupe">
+                <span class="badge {% if structure.type_structure == 'DR' %}bleu{% else %}violet{% endif %}">
+                  {{ structure.code }}
+                </span>
+              </div>
+              <div class="cases colonnes">
+                {% for item in choix_liste %}
+                  <label class="case">
+                    <input type="checkbox" name="{{ item.choix.data.name }}"
+                           value="{{ item.choix.data.value }}"
+                           data-type-structure="{{ structure.type_structure }}"
+                           data-structure="{{ structure.code }}"
+                           {% if item.libelle == "Compteur" %}data-compteur="true"{% endif %}
+                           {% if item.choix.data.selected %}checked{% endif %}>
+                    <span>{{ item.libelle }}</span>
+                  </label>
+                  {% if item.libelle == "Compteur" %}
+                    <!-- Fait partie de la liste des équipements (même style
+                         de case), toujours visible : cocher "Compteur
+                         shunté" coche automatiquement "Compteur" en JS,
+                         pas besoin de le cocher d'abord soi-même. -->
+                    <label class="case" id="bloc-compteur">
+                      <input type="checkbox" id="case-shunte">
+                      <span>Compteur shunté</span>
+                    </label>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          {% empty %}
+            <p class="aide">Aucun équipement paramétré. Contacter l'administrateur.</p>
+          {% endfor %}
+          {% for e in form.equipements.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+
+          <!-- Le secteur n'apparaît que si un équipement DR est coché -->
+          <div class="champ" id="bloc-secteur" style="display:none;margin-top:6px">
+            <label for="{{ form.secteur.id_for_label }}">
+              Secteur <span class="obligatoire">*</span>
+            </label>
+            {{ form.secteur }}
+            <div class="aide">
+              Un équipement DR est coché : préciser le secteur concerné.
+            </div>
+            {% for e in form.secteur.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="message info" id="info-multi" style="display:none;margin-top:12px">
+            Ce dépannage concerne plusieurs structures. Il apparaîtra dans chaque file
+            et ne sera définitif qu'une fois clôturé des deux côtés.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <!-- Photos -->
+      <div class="carte" style="margin-bottom:16px">
+        <div class="titre"><h2>Pièces obligatoires</h2></div>
+        <div class="corps">
+
+          <div class="champ">
+            <span class="etiquette">
+              Photos de l'ouvrage <span class="obligatoire">*</span>
+            </span>
+            <div class="zone-photo" id="zone-ouvrage">
+              <div class="actions">
+                <button type="button" class="btn secondaire petit"
+                        onclick="declencher('photos_ouvrage', 'CAMERA')"><span class="btn-symbol i-camera" aria-hidden="true"></span> Prendre</button>
+                <button type="button" class="btn secondaire petit"
+                        onclick="declencher('photos_ouvrage', 'GALERIE')"><span class="btn-symbol i-attach" aria-hidden="true"></span> Joindre</button>
+              </div>
+              <div class="apercus" id="apercus-photos_ouvrage"></div>
+            </div>
+            <input type="file" name="photos_ouvrage" id="id_photos_ouvrage"
+                   accept="image/*" multiple style="display:none">
+            <input type="hidden" name="photos_ouvrage_origine" id="origine-photos_ouvrage" value="CAMERA">
+            {% for e in form.photos_ouvrage.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="champ">
+            <span class="etiquette">Photo de la fiche d'avis <span class="obligatoire">*</span></span>
+            <div class="zone-photo" id="zone-fiche">
+              <div class="actions">
+                <button type="button" class="btn secondaire petit"
+                        onclick="declencher('photo_fiche_avis', 'CAMERA')"><span class="btn-symbol i-camera" aria-hidden="true"></span> Prendre</button>
+                <button type="button" class="btn secondaire petit"
+                        onclick="declencher('photo_fiche_avis', 'GALERIE')"><span class="btn-symbol i-attach" aria-hidden="true"></span> Joindre</button>
+              </div>
+              <div class="apercus" id="apercus-photo_fiche_avis"></div>
+            </div>
+            <input type="file" name="photo_fiche_avis" id="id_photo_fiche_avis"
+                   accept="image/*" style="display:none">
+            <input type="hidden" name="photo_fiche_avis_origine" id="origine-photo_fiche_avis" value="CAMERA">
+            {% for e in form.photo_fiche_avis.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Commentaire -->
+      <div class="carte" style="margin-bottom:16px">
+        <div class="titre"><h2>Commentaire</h2></div>
+        <div class="corps">
+          {{ form.commentaire }}
+        </div>
+      </div>
+
+      <button type="submit" class="btn orange large" id="btn-enregistrer">
+        <span class="btn-symbol i-check" aria-hidden="true"></span> Enregistrer
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/compression.js' %}"></script>
+<script src="{% static 'js/saisie.js' %}"></script>
+{% endblock %}

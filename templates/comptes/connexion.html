@@ -1,0 +1,74 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connexion - Gestion des dépannages</title>
+  <meta name="theme-color" content="#f8fbf7">
+  <link rel="icon" href="{% static 'img/agent-depannage.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="connexion-body">
+<div class="page-connexion">
+  <main class="connexion-mobile">
+    <section class="connexion-presentation">
+      <div class="connexion-hero">
+        <div class="connexion-logo-principal">
+          <img src="{% static 'img/agent-depannage.svg' %}" alt="">
+        </div>
+        <h1>Gestion des dépannages</h1>
+        <p>Connexion sécurisée</p>
+      </div>
+    </section>
+
+    <section class="boite-connexion">
+
+
+    {% for message in messages %}
+      <div class="message {{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+    <div id="zone-message"></div>
+
+    <form method="post" autocomplete="on" id="form-mot-passe" class="formulaire-mot-passe ouvert">
+      {% csrf_token %}
+      <div class="champ">
+        <label for="id_matricule">Matricule</label>
+        <input type="text" name="matricule" id="id_matricule" autocomplete="username" required>
+      </div>
+      <div class="champ">
+        <label for="id_password">Mot de passe</label>
+        <div class="champ-mot-passe">
+          <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+          <button type="button" id="btn-voir-mot-passe" class="btn-voir-mot-passe" aria-label="Afficher le mot de passe" aria-pressed="false">
+            <span class="ico i-eye" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+      <button type="submit" class="btn large">Se connecter</button>
+      <div style="margin-top:12px;text-align:center">
+        <a href="{% url 'comptes:mot_de_passe_oublie' %}" class="aide">Mot de passe oublié ?</a>
+      </div>
+    </form>
+
+    <!-- Connexion par empreinte : le navigateur déverrouille la clé privée
+         stockée sur l'appareil. Aucune donnée biométrique n'est envoyée. -->
+    <div id="bloc-empreinte" class="bloc-empreinte empreinte-secondaire">
+      <div class="separateur">ou</div>
+      <input type="text" id="matricule-bio" autocomplete="username" hidden>
+      <button type="button" class="bouton-empreinte" id="btn-empreinte" aria-label="Se connecter par empreinte"
+              data-url-debut="{% url 'comptes:webauthn_connexion_debut' %}"
+              data-url-fin="{% url 'comptes:webauthn_connexion_fin' %}">
+        <img src="{% static 'img/fingerprint.svg' %}" alt="" class="empreinte-icone">
+        <span>
+          <strong>Connexion par empreinte</strong>
+          <small>Après activation dans le profil</small>
+        </span>
+      </button>
+    </div>
+    </section>
+  </main>
+</div>
+
+<script src="{% static 'js/connexion.js' %}"></script>
+</body>
+</html>

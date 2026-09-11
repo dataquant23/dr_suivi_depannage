@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load static depannage_extras %}
+
+{% block titre %}Clôturer BT {{ depannage.numero_bt }}{% endblock %}
+{% block titre_page %}Clôturer BT {{ depannage.numero_bt }}{% endblock %}
+
+{% block contenu %}
+<form method="post" enctype="multipart/form-data" id="form-cloture" novalidate>
+  {% csrf_token %}
+
+  <div class="carte cloture-essentielle">
+    <div class="titre">
+      <h2>Clôture du dossier</h2>
+      <span class="badge {% if depannage.est_shunte %}orange{% else %}rouge{% endif %}">
+        {{ depannage.get_categorie_provisoire_display }}
+      </span>
+    </div>
+    <div class="corps">
+      {% if form.non_field_errors %}
+        <div class="message error">{{ form.non_field_errors|join:" " }}</div>
+      {% endif %}
+
+      <div class="resume-cloture">
+        <div><span>N BT / BTA</span><strong>{{ depannage.numero_bt }}</strong></div>
+        {% if user|est_responsable %}
+          <div><span>Zone</span><strong>{{ depannage.zone_libelle }}</strong></div>
+          <div><span>Ancienneté</span><strong>{{ depannage.heures_ecoulees|floatformat:0 }} h</strong></div>
+          <div><span>État</span>
+            {% if depannage.etat_delai == 'DEPASSE' %}
+              <strong class="texte-danger">Dépassé +{{ depannage.retard_heures }} h</strong>
+            {% elif depannage.etat_delai == 'BIENTOT' %}
+              <strong>Échéance proche</strong>
+            {% else %}
+              <strong>Dans les délais</strong>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+
+      {% if cloturables|length > 1 %}
+        <div class="champ">
+          <label for="{{ form.structure.id_for_label }}">Structure à clôturer <span class="obligatoire">*</span></label>
+          {{ form.structure }}
+          {% for e in form.structure.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+        </div>
+      {% else %}
+        <input type="hidden" name="structure" value="{{ cloturables.0.pk }}">
+      {% endif %}
+
+      <div class="grille deux">
+        <div class="champ">
+          <span class="etiquette">Bon de dépannage</span>
+          <div class="zone-photo" id="zone-bon">
+            <div class="actions">
+              <button type="button" class="btn secondaire petit"
+                      onclick="declencher('bon_depannage', 'CAMERA')"><span class="btn-symbol i-camera" aria-hidden="true"></span> Prendre</button>
+              <button type="button" class="btn secondaire petit"
+                      onclick="declencher('bon_depannage', 'GALERIE')"><span class="btn-symbol i-attach" aria-hidden="true"></span> Joindre</button>
+            </div>
+            <div class="apercus" id="apercus-bon_depannage"></div>
+          </div>
+          <input type="file" name="bon_depannage" id="id_bon_depannage"
+                 accept="image/*" multiple style="display:none">
+          {% for e in form.bon_depannage.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="champ">
+          <span class="etiquette">Photo équipement <span class="obligatoire">*</span></span>
+          <div class="zone-photo" id="zone-equipement">
+            <div class="actions">
+              <button type="button" class="btn secondaire petit"
+                      onclick="declencher('photos_equipement', 'CAMERA')"><span class="btn-symbol i-camera" aria-hidden="true"></span> Prendre</button>
+              <button type="button" class="btn secondaire petit"
+                      onclick="declencher('photos_equipement', 'GALERIE')"><span class="btn-symbol i-attach" aria-hidden="true"></span> Joindre</button>
+            </div>
+            <div class="apercus" id="apercus-photos_equipement"></div>
+          </div>
+          <input type="file" name="photos_equipement" id="id_photos_equipement"
+                 accept="image/*" multiple style="display:none">
+          {% for e in form.photos_equipement.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+
+      <div class="champ">
+        <label for="{{ form.commentaire.id_for_label }}">Commentaire</label>
+        {{ form.commentaire }}
+      </div>
+
+      <button type="submit" class="btn large" id="btn-valider">
+        <span class="btn-symbol i-check" aria-hidden="true"></span> Valider la clôture
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/compression.js' %}"></script>
+<script src="{% static 'js/cloture.js' %}"></script>
+{% endblock %}

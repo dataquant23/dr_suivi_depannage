@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block titre %}Recherche{% endblock %}
+{% block titre_page %}Recherche{% endblock %}
+
+{% block contenu %}
+<div class="carte" style="margin-bottom:18px">
+  <div class="corps">
+    <form method="get" class="filtres">
+      <div class="champ" style="flex:1">
+        <label for="q">Numéro BT ou repérage</label>
+        <input type="search" name="q" id="q" value="{{ q }}" placeholder="Ex. 24699" autofocus>
+      </div>
+      <button type="submit" class="btn">Rechercher</button>
+    </form>
+  </div>
+</div>
+
+{% if q %}
+  <div class="carte">
+    <div class="titre">
+      <h2>{{ resultats|length }} résultat(s) pour "{{ q }}"</h2>
+    </div>
+    <div class="tableau-conteneur">
+      <table class="tableau">
+        <thead>
+          <tr><th>N BT</th><th>Secteur</th><th>Type</th><th>Statut</th><th>Date</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for depannage in resultats %}
+            <tr>
+              <td class="num">{{ depannage.numero_bt }}</td>
+              <td>{{ depannage.secteur.libelle }}</td>
+              <td>
+                {% if depannage.est_provisoire %}
+                  <span class="badge {% if depannage.est_shunte %}orange{% else %}rouge{% endif %}">
+                    {{ depannage.get_categorie_provisoire_display }}
+                  </span>
+                {% else %}
+                  <span class="badge vert">Définitif</span>
+                {% endif %}
+              </td>
+              <td><span class="badge gris">{{ depannage.get_statut_display }}</span></td>
+              <td>{{ depannage.date_saisie|date:"d/m/Y H:i" }}</td>
+              <td><a href="{{ depannage.get_absolute_url }}">Ouvrir</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="vide">Aucun dossier ne correspond à cette recherche.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "comptes/base_auth.html" %}
+
+{% block titre %}Lien envoyé{% endblock %}
+{% block entete %}Vérifiez vos e-mails{% endblock %}
+{% block sous_titre %}Lien de réinitialisation envoyé{% endblock %}
+
+{% block contenu %}
+  {# Message volontairement identique que l'adresse existe ou non : sinon ce
+     formulaire permettrait de savoir quelles adresses ont un compte. #}
+  <div class="message success" style="margin:0 0 16px">
+    Si un compte est associé à cette adresse, un lien de réinitialisation
+    vient d'être envoyé.
+  </div>
+
+  <p class="aide" style="margin:0 0 8px">
+    Le lien est valable 2 heures. Pensez à regarder dans les courriers
+    indésirables.
+  </p>
+  <p class="aide" style="margin:0 0 16px">
+    Sans e-mail au bout de quelques minutes, contactez votre administrateur :
+    l'adresse enregistrée n'est peut-être pas celle-ci.
+  </p>
+
+  <div style="text-align:center">
+    <a href="{% url 'comptes:connexion' %}" class="btn secondaire">Retour à la connexion</a>
+  </div>
+{% endblock %}

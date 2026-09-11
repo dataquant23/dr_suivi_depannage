@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block titre %}Rapports{% endblock %}
+{% block titre_page %}Rapports{% endblock %}
+{% block titre_icone %}<span class="entete-icone"><span class="ico i-chart" aria-hidden="true"></span></span>{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Statistiques par période, secteur et équipement, export Excel/PDF.</p>{% endblock %}
+
+{% block contenu %}
+
+<div class="carte" style="margin-bottom:18px">
+  <div class="corps">
+    <form method="get" class="filtres">
+      <div class="champ">
+        <label for="periode">Période</label>
+        <select name="periode" id="periode" onchange="basculerDates()">
+          <option value="semaine" {% if periode == 'semaine' %}selected{% endif %}>Semaine en cours</option>
+          <option value="mois" {% if periode == 'mois' %}selected{% endif %}>Mois en cours</option>
+          <option value="personnalisee" {% if periode == 'personnalisee' %}selected{% endif %}>Période personnalisée</option>
+        </select>
+      </div>
+      <div class="champ" id="bloc-dates" style="display:none">
+        <label for="debut">Du</label>
+        <input type="date" name="debut" id="debut" value="{{ debut|date:'Y-m-d' }}">
+      </div>
+      <div class="champ" id="bloc-dates-fin" style="display:none">
+        <label for="fin">Au</label>
+        <input type="date" name="fin" id="fin" value="{{ fin|date:'Y-m-d' }}">
+      </div>
+      <div class="champ">
+        <label for="secteur">Secteur</label>
+        <select name="secteur" id="secteur">
+          <option value="">Tous les secteurs</option>
+          {% for s in secteurs %}
+            <option value="{{ s.pk }}" {% if request.GET.secteur == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.libelle }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn">Afficher</button>
+      <button type="submit" name="export" value="pdf" class="btn">
+        <span class="btn-symbol i-download" aria-hidden="true"></span> Bilan
+      </button>
+      <button type="submit" name="export" value="excel" class="btn secondaire">
+        <span class="btn-symbol i-download" aria-hidden="true"></span> Export Excel
+      </button>
+      <button type="submit" name="export" value="resume_structures_pdf" class="btn secondaire">
+        <span class="btn-symbol i-download" aria-hidden="true"></span> Résumé DR/DC (PDF)
+      </button>
+      <button type="submit" name="export" value="detail_excel" class="btn secondaire icone"
+              title="Télécharger le détail des dossiers (Excel)" aria-label="Télécharger le détail des dossiers (Excel)">
+        <span class="btn-symbol i-download" aria-hidden="true"></span>
+      </button>
+    </form>
+    <div class="aide" style="margin-top:10px">
+      Du {{ debut|date:"d/m/Y" }} au {{ fin|date:"d/m/Y" }}
+    </div>
+  </div>
+</div>
+
+<div class="grille kpi" style="margin-bottom:18px">
+  <div class="kpi-tuile bleu">
+    <div class="kpi-icone"><span class="ico i-clipboard" aria-hidden="true"></span></div>
+    <div><div class="valeur">{{ total }}</div><div class="libelle">Dépannages</div></div>
+  </div>
+  <div class="kpi-tuile vert">
+    <div class="kpi-icone"><span class="ico i-check" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ definitifs }}</div>
+      <div class="libelle">Définitifs</div>
+      <div class="detail">{{ pct_definitifs }} % du total</div>
+    </div>
+  </div>
+  <div class="kpi-tuile orange">
+    <div class="kpi-icone"><span class="ico i-clock" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ provisoires }}</div>
+      <div class="libelle">À clôturer</div>
+      <div class="detail">{{ pct_provisoires }} % du total</div>
+    </div>
+  </div>
+  <div class="kpi-tuile orange">
+    <div class="kpi-icone"><span class="ico i-bolt" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ shuntes }}</div>
+      <div class="libelle">Compteurs shuntés</div>
+    </div>
+  </div>
+</div>
+
+<div class="grille kpi" style="margin-bottom:18px">
+  <div class="kpi-tuile violet">
+    <div class="kpi-icone"><span class="ico i-refresh" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ regularises }}</div>
+      <div class="libelle">Dossiers clôturés</div>
+    </div>
+  </div>
+  <div class="kpi-tuile bleu">
+    <div class="kpi-icone"><span class="ico i-target" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ delai_moyen }} h</div>
+      <div class="libelle">Délai moyen de clôture</div>
+    </div>
+  </div>
+  <div class="kpi-tuile rouge">
+    <div class="kpi-icone"><span class="ico i-alert" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ hors_delai }}</div>
+      <div class="libelle">Clôtures hors délai</div>
+    </div>
+  </div>
+</div>
+
+<div class="grille trois">
+  <div class="carte">
+    <div class="titre"><h2>Par secteur</h2></div>
+    <div class="corps">
+      <div class="barres">
+        {% for ligne in par_secteur %}
+          <div class="barre-ligne">
+            <span>{{ ligne.secteur__libelle }}</span>
+            <div class="barre-piste">
+              <span style="width:{% widthratio ligne.total par_secteur.0.total 100 %}%"></span>
+            </div>
+            <span class="val">{{ ligne.total }}</span>
+          </div>
+        {% empty %}
+          <p class="aide">Aucune donnée sur cette période.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="carte">
+    <div class="titre"><h2>Par équipement</h2></div>
+    <div class="corps">
+      <div class="barres">
+        {% for ligne in par_equipement %}
+          {% if ligne.equipements__libelle %}
+          <div class="barre-ligne">
+            <span>{{ ligne.equipements__libelle }}</span>
+            <div class="barre-piste">
+              <span style="width:{% widthratio ligne.total par_equipement.0.total 100 %}%;background:var(--violet)"></span>
+            </div>
+            <span class="val">{{ ligne.total }}</span>
+          </div>
+          {% endif %}
+        {% empty %}
+          <p class="aide">Aucune donnée sur cette période.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="carte">
+    <div class="titre">
+      <h2>Par commune</h2>
+      <a href="{% url 'depannages:zones' %}?niveau=commune" class="lien">Carte &rarr;</a>
+    </div>
+    <div class="corps">
+      <div class="barres">
+        {% for ligne in par_commune %}
+          <div class="barre-ligne">
+            <span>{{ ligne.commune__nom|default:"Hors zone" }}</span>
+            <div class="barre-piste">
+              <span style="width:{% widthratio ligne.total par_commune.0.total 100 %}%;background:var(--orange)"></span>
+            </div>
+            <span class="val">{{ ligne.total }}</span>
+          </div>
+        {% empty %}
+          <p class="aide">Aucune donnée sur cette période.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="carte">
+    <div class="titre">
+      <h2>Par quartier</h2>
+      <a href="{% url 'depannages:zones' %}?niveau=quartier" class="lien">Carte &rarr;</a>
+    </div>
+    <div class="corps">
+      <div class="barres">
+        {% for ligne in par_quartier %}
+          <div class="barre-ligne">
+            <span title="{{ ligne.commune__nom }}">{{ ligne.quartier__nom }}</span>
+            <div class="barre-piste">
+              <span style="width:{% widthratio ligne.total par_quartier.0.total 100 %}%;background:var(--rouge)"></span>
+            </div>
+            <span class="val">{{ ligne.total }}</span>
+          </div>
+        {% empty %}
+          <p class="aide">Aucun dossier rattaché à un quartier sur cette période.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="carte" style="margin-top:18px">
+  <div class="titre">
+    <h2>Traitement par secteur et équipement</h2>
+    <a href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}export=matrice_excel"
+       class="btn secondaire petit">
+      <span class="btn-symbol i-download" aria-hidden="true"></span> Télécharger
+    </a>
+  </div>
+  <div class="corps">
+    <div class="grille-secteurs-equip">
+      {% for bloc in cartes_secteur_equipement %}
+        <div class="carte-secteur-equip">
+          <div class="entete-secteur-equip">
+            <strong>{{ bloc.secteur.libelle }}</strong>
+            <span class="badge {{ bloc.provisoires.classe_taux|default:'gris' }}">
+              {% if bloc.provisoires.taux != None %}{{ bloc.provisoires.taux }} %{% else %}—{% endif %}
+            </span>
+          </div>
+          <div class="chiffres-secteur-equip">
+            <span><strong>{{ bloc.provisoires.crees }}</strong> créés</span>
+            <span><strong>{{ bloc.provisoires.traites }}</strong> traités</span>
+            <span>
+              {% if bloc.provisoires.delai != None %}
+                <strong>{{ bloc.provisoires.delai }} j</strong> ({{ bloc.provisoires.delai_h }} h) délai moyen
+              {% else %}
+                <strong>—</strong> délai moyen
+              {% endif %}
+            </span>
+          </div>
+          <div class="liste-equip-secteur">
+            {% for e in bloc.equipements %}
+              {% ifchanged e.structure %}
+                <div class="sous-groupe-structure">{{ e.structure }}</div>
+              {% endifchanged %}
+              <div class="ligne-equip-secteur">
+                <span class="nom-equip" title="{{ e.libelle }}">{{ e.libelle }}</span>
+                <div class="barre-piste mini">
+                  <span class="{{ e.classe_taux }}" style="width:{{ e.taux|default:0 }}%"></span>
+                </div>
+                <span class="val-equip">{% if e.taux != None %}{{ e.taux }} %{% else %}—{% endif %}</span>
+                <span class="delai-equip">
+                  {% if e.delai != None %}{{ e.delai }} j &middot; {{ e.delai_h }} h{% else %}—{% endif %}
+                </span>
+              </div>
+            {% empty %}
+              <p class="aide">Aucun équipement sur cette période.</p>
+            {% endfor %}
+          </div>
+        </div>
+      {% empty %}
+        <p class="aide">Aucune donnée sur cette période.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function basculerDates() {
+  const personnalisee = document.getElementById("periode").value === "personnalisee";
+  document.getElementById("bloc-dates").style.display = personnalisee ? "block" : "none";
+  document.getElementById("bloc-dates-fin").style.display = personnalisee ? "block" : "none";
+}
+basculerDates();
+</script>
+{% endblock %}

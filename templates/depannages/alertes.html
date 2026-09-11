@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block titre %}Alertes{% endblock %}
+{% block titre_page %}Alertes{% endblock %}
+{% block titre_icone %}<span class="entete-icone"><span class="ico i-alert" aria-hidden="true"></span></span>{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Délais dépassés et échéances proches à traiter.</p>{% endblock %}
+
+{% block contenu %}
+
+<div class="carte" style="margin-bottom:18px">
+  <div class="corps" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div>
+      <span class="etiquette" style="margin:0">Délais en vigueur</span>
+      <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+        <span class="badge rouge">Compteur shunté : {{ parametres.delai_compteur_shunte }} h</span>
+        <span class="badge orange">Sans électricité : {{ parametres.delai_sans_electricite }} h</span>
+        <span class="badge gris">Autres équipements : {{ parametres.delai_autre_equipement }} h</span>
+        <span class="badge bleu">Alerte anticipée : {{ parametres.seuil_alerte_pct }} %</span>
+      </div>
+    </div>
+    <a href="{% url 'referentiel:delais' %}" class="btn secondaire" style="margin-left:auto">
+      &#9881; Modifier les délais
+    </a>
+  </div>
+</div>
+
+<div class="section-travaux critique">
+  <div class="bandeau">
+    &#9888; DÉLAIS DÉPASSÉS <span class="compte">{{ nb_depasses }}</span>
+  </div>
+  {% for depannage in depasses %}
+    <div class="ligne-travail">
+      <div class="bt">BT {{ depannage.numero_bt }}</div>
+      <div>
+        <span class="badge {% if depannage.est_shunte %}orange{% else %}rouge{% endif %}">
+          {{ depannage.get_categorie_provisoire_display }}
+        </span>
+      </div>
+      <div class="secteur">{{ depannage.secteur.libelle }}</div>
+      <div class="temps">
+        {{ depannage.heures_ecoulees|floatformat:0 }} h / {{ depannage.delai_applique_heures }} h
+        <div class="jauge depasse"><span style="width:100%"></span></div>
+      </div>
+      <div><span class="badge rouge">+{{ depannage.retard_heures }} h</span></div>
+      <div class="secteur" style="min-width:auto;font-size:12px">
+        {{ depannage.cree_par }} &middot; {{ depannage.date_saisie|date:"d/m H:i" }}
+      </div>
+      <div class="actions">
+        <a href="{{ depannage.get_absolute_url }}" class="btn secondaire petit">Voir</a>
+        {% if depannage.url_maps %}
+          <a href="{{ depannage.url_maps }}" target="_blank" rel="noopener" class="btn petit">Itinéraire</a>
+        {% endif %}
+      </div>
+    </div>
+  {% empty %}
+    <div class="ligne-travail"><div class="vide" style="width:100%;padding:26px">
+      <span class="ico">&#10003;</span> Aucun délai dépassé.
+    </div></div>
+  {% endfor %}
+
+  {% if page_depasses.has_other_pages %}
+    <div class="pagination-simple">
+      {% if page_depasses.has_previous %}
+        <a class="btn secondaire petit" href="?page={{ page_depasses.previous_page_number }}">Préc</a>
+      {% else %}
+        <span class="btn secondaire petit desactive">Préc</span>
+      {% endif %}
+      <span class="pagination-compteur">
+        {{ page_depasses.number }} / {{ page_depasses.paginator.num_pages }}
+      </span>
+      {% if page_depasses.has_next %}
+        <a class="btn secondaire petit" href="?page={{ page_depasses.next_page_number }}">Suiv</a>
+      {% else %}
+        <span class="btn secondaire petit desactive">Suiv</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<div class="section-travaux attention">
+  <div class="bandeau">
+    &#9203; ÉCHÉANCES PROCHES <span class="compte">{{ proches|length }}</span>
+  </div>
+  {% for depannage in proches %}
+    <div class="ligne-travail">
+      <div class="bt">BT {{ depannage.numero_bt }}</div>
+      <div class="secteur">{{ depannage.secteur.libelle }}</div>
+      <div class="temps">
+        {{ depannage.heures_ecoulees|floatformat:0 }} h / {{ depannage.delai_applique_heures }} h
+        <div class="jauge bientot"><span style="width:{{ depannage.pourcentage_delai }}%"></span></div>
+      </div>
+       <div class="actions">
+        <a href="{{ depannage.get_absolute_url }}" class="btn secondaire petit">Voir</a>
+      </div>
+    </div>
+  {% empty %}
+    <div class="ligne-travail"><div class="vide" style="width:100%;padding:26px">
+      Aucune échéance proche.
+    </div></div>
+  {% endfor %}
+</div>
+{% endblock %}

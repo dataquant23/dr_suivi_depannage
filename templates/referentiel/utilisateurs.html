@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load static depannage_extras %}
+
+{% block titre %}Utilisateurs{% endblock %}
+{% block titre_page %}Utilisateurs{% endblock %}
+{% block titre_icone %}<span class="entete-icone"><span class="ico i-user" aria-hidden="true"></span></span>{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Comptes, périmètre géographique et rôle dépannage.</p>{% endblock %}
+
+{% block contenu %}
+
+<div class="carte" style="margin-bottom:18px">
+  <div class="corps">
+    <form method="get" class="filtres">
+      <div class="champ" style="flex:1">
+        <label for="q">Rechercher</label>
+        <input type="search" name="q" id="q" value="{{ q }}" placeholder="Matricule, nom ou prénoms...">
+      </div>
+      <button type="submit" class="btn secondaire">Filtrer</button>
+      <a href="{% url 'referentiel:creer_utilisateur' %}" class="btn orange">+ Ajouter un utilisateur</a>
+      <a href="{% url 'comptes:gestion_acces' %}" class="btn secondaire">Gestion des accès</a>
+    </form>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="tableau-conteneur">
+    <table class="tableau">
+      <thead>
+        <tr>
+          <th>Utilisateur</th><th>Matricule</th><th>Rôle dépannage</th>
+          <th>Structure</th><th>Secteurs</th><th>Empreinte</th><th>État</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for compte, acces in lignes %}
+          <tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:9px">
+                <div class="avatar" style="width:30px;height:30px;font-size:11px">{{ compte|initiales_agent }}</div>
+                <strong>{{ compte.display_name }}</strong>
+              </div>
+            </td>
+            <td>{{ compte.matricule }}</td>
+            <td>
+              {% if acces %}
+                <span class="badge {% if not acces.actif %}gris{% elif acces.profil == 'Administration' %}violet{% elif acces.profil == 'Responsable' %}bleu{% else %}gris{% endif %}">
+                  {{ acces.profil }}{% if not acces.actif %} (suspendu){% endif %}
+                </span>
+              {% else %}
+                <span class="aide">Aucun accès</span>
+              {% endif %}
+            </td>
+            <td>{{ compte.affectation_depannage.structure.code|default:"-" }}</td>
+            <td>
+              {% if compte.affectation_depannage.secteurs.exists %}
+                {{ compte.affectation_depannage.secteurs.count }} secteur(s)
+              {% else %}
+                <span class="aide">Toute la structure</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if compte.cles_webauthn.exists %}
+                <span class="badge vert"><img src="{% static 'img/fingerprint.svg' %}" alt="" class="badge-icone"> Activée</span>
+              {% else %}
+                <span class="badge gris">Mot de passe</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if compte.is_active %}
+                <span class="badge vert">Actif</span>
+              {% else %}
+                <span class="badge rouge">Suspendu</span>
+              {% endif %}
+              {% if compte.must_change_password %}
+                <span class="badge orange" title="L'agent ne s'est pas encore connecté pour choisir son mot de passe">
+                  Accès non activés
+                </span>
+              {% endif %}
+            </td>
+            <td style="white-space:nowrap">
+              <a href="{% url 'referentiel:modifier_utilisateur' compte.pk %}" class="btn secondaire petit">Périmètre</a>
+              {% if compte.email %}
+                <form method="post" action="{% url 'referentiel:renvoyer_acces' compte.pk %}"
+                      style="display:inline"
+                      onsubmit="return confirm('Générer un nouveau mot de passe provisoire et l\'envoyer par e-mail ? L\'ancien mot de passe ne fonctionnera plus.');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn secondaire petit">Renvoyer les accès</button>
+                </form>
+              {% endif %}
+              {% if acces and compte != user %}
+                <form method="post" action="{% url 'referentiel:basculer_utilisateur' compte.pk %}"
+                      style="display:inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn {% if acces.actif %}secondaire{% else %}succes{% endif %} petit">
+                    {% if acces.actif %}Suspendre l'accès{% else %}Réactiver l'accès{% endif %}
+                  </button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="vide">Aucun utilisateur.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="pagination-simple">
+      {% if page_obj.has_previous %}
+        <a class="btn secondaire petit"
+           href="?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">
+          Préc
+        </a>
+      {% else %}
+        <span class="btn secondaire petit desactive">Préc</span>
+      {% endif %}
+      <span class="pagination-compteur">
+        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+      </span>
+      {% if page_obj.has_next %}
+        <a class="btn secondaire petit"
+           href="?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">
+          Suiv
+        </a>
+      {% else %}
+        <span class="btn secondaire petit desactive">Suiv</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

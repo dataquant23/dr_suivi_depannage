@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load depannage_extras %}
+
+{% block titre %}Paramètres{% endblock %}
+{% block titre_page %}Paramètres{% endblock %}
+{% block titre_icone %}<span class="entete-icone"><span class="ico i-settings" aria-hidden="true"></span></span>{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Délais de traitement, secteurs et accès.</p>{% endblock %}
+
+{% block contenu %}
+
+<div class="grille kpi" style="margin-bottom:18px">
+  <div class="kpi-tuile bleu">
+    <div class="ico">&#128100;</div>
+    <div><div class="valeur">{{ nb_utilisateurs }}</div><div class="libelle">Utilisateurs actifs</div></div>
+  </div>
+  <div class="kpi-tuile vert">
+    <div class="ico">&#128506;</div>
+    <div><div class="valeur">{{ nb_secteurs }}</div><div class="libelle">Secteurs</div></div>
+  </div>
+</div>
+
+<div class="grille deux">
+  <div>
+    <div class="carte" style="margin-bottom:16px">
+      <div class="titre">
+        <h2>Délais de traitement</h2>
+        <a href="{% url 'referentiel:delais' %}" class="lien">Modifier &rarr;</a>
+      </div>
+      <div class="corps">
+        <dl class="paire">
+          <dt>Compteur shunté</dt>
+          <dd><span class="badge rouge">{{ parametres.delai_compteur_shunte }} heures</span></dd>
+          <dt>Client sans électricité</dt>
+          <dd><span class="badge orange">{{ parametres.delai_sans_electricite }} heures</span></dd>
+          <dt>Autres équipements</dt>
+          <dd><span class="badge gris">{{ parametres.delai_autre_equipement }} heures</span></dd>
+          <dt>Alerte anticipée</dt>
+          <dd><span class="badge bleu">{{ parametres.seuil_alerte_pct }} % du délai</span></dd>
+        </dl>
+        {% if parametres.modifie_par %}
+          <div class="aide" style="margin-top:12px">
+            Dernière modification par {{ parametres.modifie_par }}
+            le {{ parametres.modifie_le|date:"d/m/Y H:i" }}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <div>
+    {% if user|est_admin %}
+      <div class="carte" style="margin-bottom:16px">
+        <div class="titre"><h2>Accès et rôles</h2></div>
+        <div class="corps">
+          <p class="aide" style="margin-top:0">
+            Créer des agents, définir leur périmètre (structure, secteurs) et
+            leur rôle dépannage.
+          </p>
+          <a href="{% url 'referentiel:utilisateurs' %}" class="btn" style="width:100%">
+            &#128100; Gérer les utilisateurs
+          </a>
+        </div>
+      </div>
+    {% endif %}
+    {% if user.profil == 'Direction régionale' or user.profil == 'Responsable commercial' %}
+      <div class="carte" style="margin-bottom:16px">
+        <div class="titre"><h2>Gestion des accès</h2></div>
+        <div class="corps">
+          <p class="aide" style="margin-top:0">
+            Attribuer ou retirer le rôle dépannage d'un agent déjà créé.
+          </p>
+          <a href="{% url 'comptes:gestion_acces' %}" class="btn secondaire" style="width:100%">
+            &#128272; Gestion des accès
+          </a>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="carte">
+      <div class="titre"><h2>Journal des modifications de délai</h2></div>
+      <div class="corps" style="padding:0">
+        <div class="chrono" style="padding:0 18px">
+          {% for ligne in historique_delais %}
+            <div class="etape">
+              <span class="quand">{{ ligne.modifie_le|date:"d/m/Y H:i" }}</span>
+              <div>
+                <strong>{{ ligne.champ }}</strong>
+                <div class="aide">
+                  {{ ligne.ancienne_valeur }} &rarr; {{ ligne.nouvelle_valeur }}
+                  {% if ligne.modifie_par %} &middot; {{ ligne.modifie_par }}{% endif %}
+                </div>
+              </div>
+            </div>
+          {% empty %}
+            <div class="vide">Aucune modification enregistrée.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

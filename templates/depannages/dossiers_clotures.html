@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load static depannage_extras %}
+
+{% block titre %}Dossiers clôturés{% endblock %}
+{% block body_class %}page-travaux{% endblock %}
+{% block titre_page %}Dossiers clôturés{% endblock %}
+{% block titre_icone %}
+  <button type="button" class="entete-bouton-retour" id="btn-retour-clotures" data-secours="{% url 'depannages:tableau_bord' %}" aria-label="Retour">
+    <span class="ico i-fleche-gauche" aria-hidden="true"></span>
+  </button>
+  <span class="entete-icone entete-icone-desktop"><span class="ico i-check" aria-hidden="true"></span></span>
+{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Dossiers déjà traités, triés par date de clôture.</p>{% endblock %}
+
+{% block contenu %}
+
+<div class="carte filtres-travaux" style="margin-bottom:18px">
+  <div class="corps">
+    <form method="get" class="filtres">
+      <div class="champ">
+        <label for="{{ form.q.id_for_label }}">Recherche par  Nº BTA</label>
+        {{ form.q }}
+      </div>
+      <div class="champ">
+        <label for="{{ form.secteur.id_for_label }}">Secteur</label>
+        {{ form.secteur }}
+      </div>
+      <button type="submit" class="btn">Filtrer</button>
+      <a href="{% url 'depannages:dossiers_clotures' %}" class="btn secondaire">Réinitialiser</a>
+    </form>
+  </div>
+</div>
+
+<div class="carte travaux-unifies">
+  <div class="titre">
+    <h2>Dossiers clôturés</h2>
+    <span class="badge vert">{{ total }}</span>
+  </div>
+  <div class="corps" style="padding:0">
+    <div class="entete-liste-travaux" aria-hidden="true">
+      <span></span>
+      <span>Dossier</span>
+      <span>Durée</span>
+      <span>Structure</span>
+      <span>Actions</span>
+    </div>
+    {% for depannage in depannages %}
+      <div class="ligne-travail">
+        <div class="ligne-icone-travail">
+          <span class="ico i-check" aria-hidden="true"></span>
+        </div>
+
+        <div class="travail-identite">
+          <div class="bt">BT {{ depannage.numero_bt }}</div>
+          <div class="travail-alerte" style="color:var(--texte-doux)">
+            {{ depannage.secteur.libelle|default:"Réseau" }}
+          </div>
+        </div>
+
+        <div class="travail-type">
+          <span class="badge {% if depannage.est_shunte %}orange{% elif depannage.categorie_provisoire == 'SANS_ELECTRICITE' %}rouge{% else %}bleu{% endif %}">
+            {{ depannage.get_categorie_provisoire_display|default:"Définitif" }}
+          </span>
+          <span class="heures-ecoulees">{{ depannage.heures_ecoulees|jours_heures }}</span>
+        </div>
+
+        <div class="parts-structure">
+          {% for structure in depannage.structures_concernees %}
+            <span class="part faite">&#10003; {{ structure.code }}</span>
+          {% endfor %}
+        </div>
+
+        <div class="actions">
+          <a href="{{ depannage.get_absolute_url }}" class="btn secondaire petit">
+            <span class="btn-symbol i-eye" aria-hidden="true"></span> Voir
+          </a>
+        </div>
+      </div>
+    {% empty %}
+      <div class="vide">
+        <span class="ico">&#10003;</span>
+        Aucun dossier clôturé pour ce filtre.
+      </div>
+    {% endfor %}
+
+    {% if page_obj.has_other_pages %}
+      <div class="pagination-simple">
+        {% if page_obj.has_previous %}
+          <a class="btn secondaire petit"
+             href="?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">
+            Préc
+          </a>
+        {% else %}
+          <span class="btn secondaire petit desactive">Préc</span>
+        {% endif %}
+        <span class="pagination-compteur">
+          {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </span>
+        {% if page_obj.has_next %}
+          <a class="btn secondaire petit"
+             href="?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">
+            Suiv
+          </a>
+        {% else %}
+          <span class="btn secondaire petit desactive">Suiv</span>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById("btn-retour-clotures")?.addEventListener("click", function () {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = this.dataset.secours;
+    }
+  });
+</script>
+{% endblock %}

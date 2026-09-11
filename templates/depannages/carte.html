@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load static l10n %}
+
+{% block titre %}Carte{% endblock %}
+{% block titre_page %}Carte des dépannages{% endblock %}
+{% block titre_icone %}<span class="entete-icone"><span class="ico i-map" aria-hidden="true"></span></span>{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Localisez les dépannages en cours et calculez l'itinéraire.</p>{% endblock %}
+{% block body_class %}page-carte{% endblock %}
+
+{% block entete_extra %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+{% endblock %}
+
+{% block contenu %}
+
+<div class="barre-carte" id="barre-carte">
+  <div class="recherche-carte">
+    <span class="btn-symbol i-recherche" aria-hidden="true"></span>
+    <input type="search" id="filtre-bt" placeholder="Rechercher un Nº BTA...">
+    <button type="button" class="bouton-filtres-carte" id="btn-filtres-carte"
+            title="Filtres" aria-expanded="false">
+      <span class="btn-symbol i-filtre" aria-hidden="true"></span>
+    </button>
+  </div>
+  <div class="filtres-carte-repliables" id="filtres-carte-repliables">
+    <select id="filtre-secteur">
+      <option value="">Tous les secteurs</option>
+      {% for secteur in secteurs %}
+        <option value="{{ secteur.pk }}">{{ secteur.libelle }}</option>
+      {% endfor %}
+    </select>
+    <select id="filtre-niveau-zone" title="Découpage affiché sur la carte">
+      <option value="commune">Communes</option>
+      <option value="quartier">Quartiers</option>
+    </select>
+  </div>
+  <button type="button" class="bouton-plein-ecran" id="btn-plein-ecran" title="Plein écran">
+    <span class="btn-symbol i-plein-ecran" aria-hidden="true"></span>
+  </button>
+</div>
+
+<div class="carte-stage" id="carte-stage"
+     {% localize off %}data-centre-lat="{{ centre_lat }}" data-centre-lon="{{ centre_lon }}"{% endlocalize %}
+     data-url-zones="{% url 'depannages:zones_geojson' %}"
+     data-url-donnees="{% url 'depannages:carte_donnees' %}">
+  <div id="carte-leaflet" role="img" aria-label="Carte des dépannages en cours"></div>
+
+  <!-- Outils flottants : position de référence et rayon de recherche -->
+  <div class="outils-carte">
+    <button type="button" id="outil-zoom-plus" title="Zoomer">
+      <span class="btn-symbol i-plus" aria-hidden="true"></span>
+    </button>
+    <button type="button" id="outil-zoom-moins" title="Dézoomer">
+      <span class="btn-symbol i-minus" aria-hidden="true"></span>
+    </button>
+    <hr>
+    <button type="button" id="bouton-legende-carte" class="bouton-legende-carte" title="Légende">
+      <span class="btn-symbol i-legende" aria-hidden="true"></span>
+    </button>
+    <hr>
+    <button type="button" id="mode-gps" title="Ma position">
+      <span class="btn-symbol i-target" aria-hidden="true"></span>
+    </button>
+    <button type="button" id="mode-coord" title="Saisir des coordonnées">
+      <span class="btn-symbol i-compass" aria-hidden="true"></span>
+    </button>
+    <hr>
+    <button type="button" id="outil-rayon" title="Rayon de recherche" disabled>
+      <span class="btn-symbol i-radius" aria-hidden="true"></span>
+    </button>
+    <button type="button" id="outil-effacer" title="Retirer le point de référence" disabled>
+      <span class="btn-symbol i-fermer" aria-hidden="true"></span>
+    </button>
+  </div>
+
+  <div class="popover-carte" id="popover-coord" hidden>
+    <span class="etiquette">Coordonnées précises</span>
+    <div class="filtres">
+      <div class="champ">
+        <label for="saisie-lat">Latitude</label>
+        <input type="text" id="saisie-lat" placeholder="5.4321" inputmode="decimal">
+      </div>
+      <div class="champ">
+        <label for="saisie-lon">Longitude</label>
+        <input type="text" id="saisie-lon" placeholder="-4.0159" inputmode="decimal">
+      </div>
+    </div>
+    <button type="button" class="btn secondaire" id="btn-placer-coord" style="width:100%;margin-top:10px">
+      Placer le point
+    </button>
+  </div>
+
+  <div class="popover-carte" id="popover-rayon" hidden>
+    <span class="etiquette">Rayon autour du point</span>
+    <div class="puces-rayon">
+      <button type="button" data-rayon="" class="actif">Tous</button>
+      <button type="button" data-rayon="1">1 km</button>
+      <button type="button" data-rayon="3">3 km</button>
+      <button type="button" data-rayon="5">5 km</button>
+      <button type="button" data-rayon="10">10 km</button>
+    </div>
+    <div class="rayon-perso">
+      <input type="number" id="rayon-perso" min="0.1" step="0.5" placeholder="Personnalisé">
+      <span class="unite">km</span>
+    </div>
+  </div>
+
+  <div class="resume-zone-carte" id="resume-zone-carte">
+    <button type="button" class="fermer-resume-zone" id="fermer-resume-zone" aria-label="Fermer le résumé">
+      <span class="btn-symbol i-fermer" aria-hidden="true"></span>
+    </button>
+    <span class="etiquette">Zone</span>
+    <strong>Cliquez un quartier</strong>
+    <p>Le détail de la zone survolée apparaîtra ici.</p>
+  </div>
+
+  <div class="panneau-carte">
+    <button type="button" class="poignee" id="poignee-panneau" aria-label="Afficher ou ranger la liste">
+      <span></span>
+    </button>
+    <div class="titre">
+      <h2>Dépannages en cours <span id="compte-total" class="badge bleu">0</span></h2>
+      <p class="entete-sous-titre" id="resume-perimetre" style="margin-top:4px"></p>
+    </div>
+    <div class="panneau-zones" id="repartition-zones"></div>
+    <div class="panneau-liste" id="liste-points"></div>
+    <div class="fiche-point" id="fiche-point" hidden></div>
+  </div>
+
+  <div class="legende">
+    <div class="item"><span class="puce" style="background:#f97316"></span> Compteur shunté</div>
+    <div class="item"><span class="puce" style="background:#dc2626"></span> Sans électricité</div>
+    <div class="item"><span class="puce" style="background:#2563eb"></span> Autre équipement</div>
+    <div class="item"><span class="puce" style="background:var(--vert-cie)"></span> Point de référence</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="{% static 'js/carte.js' %}"></script>
+{% endblock %}

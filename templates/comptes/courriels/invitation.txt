@@ -1,0 +1,20 @@
+Bonjour {{ utilisateur.get_full_name|default:utilisateur.matricule }},
+
+Un compte vient d'être ouvert pour vous sur l'application {{ application }}.
+
+Identifiant (matricule) : {{ utilisateur.matricule }}
+Mot de passe provisoire : {{ mot_de_passe }}
+
+Connectez-vous ici :
+{{ lien_connexion }}
+
+À votre première connexion, l'application vous demandera de remplacer ce mot
+de passe provisoire par un mot de passe personnel. Vous pourrez ensuite, si
+vous le souhaitez, activer la connexion par empreinte depuis votre profil.
+
+Ce message contient vos accès : ne le transférez à personne et supprimez-le
+une fois votre mot de passe changé.
+
+--
+{{ application }} - CIE
+Message automatique, merci de ne pas y répondre.

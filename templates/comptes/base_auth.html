@@ -1,0 +1,42 @@
+{% load static %}<!doctype html>
+{% comment %}
+Ossature commune aux écrans liés au mot de passe (changement imposé, mot de
+passe oublié, réinitialisation). Volontairement séparée de base.html : sur ces
+écrans l'agent ne doit pas disposer du menu de l'application, soit parce qu'il
+n'est pas encore authentifié, soit parce que son compte n'est pas utilisable
+tant qu'il n'a pas changé son mot de passe.
+{% endcomment %}
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titre %}Mot de passe{% endblock %} - Gestion des dépannages</title>
+  <meta name="theme-color" content="#f8fbf7">
+  <link rel="icon" href="{% static 'img/agent-depannage.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="connexion-body">
+<div class="page-connexion">
+  <main class="connexion-mobile">
+    <section class="connexion-presentation">
+      <div class="connexion-hero">
+        <div class="connexion-logo-principal">
+          <img src="{% static 'img/agent-depannage.svg' %}" alt="">
+        </div>
+        <h1>{% block entete %}Gestion des dépannages{% endblock %}</h1>
+        <p>{% block sous_titre %}Sécurité du compte{% endblock %}</p>
+      </div>
+    </section>
+
+    <section class="boite-connexion">
+      {% for message in messages %}
+        <div class="message {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+
+      {% block contenu %}{% endblock %}
+    </section>
+  </main>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

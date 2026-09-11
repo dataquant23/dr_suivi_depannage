@@ -1,0 +1,84 @@
+{% load static %}
+<h3 class="d-flex align-items-center justify-content-between">
+  <span>Gestion des accès{% if direction_agent %} — {{ direction_agent.nom }}{% endif %}</span>
+  <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-description-profils">
+    <i class="ri-information-line me-1"></i>Description des profils
+  </button>
+</h3>
+
+<div class="card">
+  <div class="table-responsive p-3">
+    <table class="table table-sm table-striped table-hover align-middle">
+      <thead>
+        <tr>
+          <th>Matricule</th><th>Nom</th><th>Fonction</th><th>Profil</th><th>Accès</th><th class="text-end">Enregistrer</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for agent, acces in lignes %}
+        <tr>
+          <td>{{ agent.matricule }}</td>
+          <td>{{ agent.display_name }}</td>
+          <td>{{ agent.fonction }}</td>
+          <td colspan="3">
+            <form method="post" class="d-flex flex-wrap align-items-center gap-2">
+              {% csrf_token %}
+              <input type="hidden" name="agent_id" value="{{ agent.pk }}">
+              <select name="profil" class="form-select form-select-sm" style="min-width:200px;">
+                {% for nom_profil, info in profils.items %}
+                  <option value="{{ nom_profil }}" {% if acces.profil == nom_profil %}selected{% endif %}>{{ nom_profil }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="actif" value="1"
+                       id="actif-{{ agent.pk }}" {% if acces.actif %}checked{% endif %}>
+                <label class="form-check-label small" for="actif-{{ agent.pk }}">Accès actif</label>
+              </div>
+              <button class="btn btn-sm btn-brand">Enregistrer</button>
+              {% if acces.actif %}
+                <span class="badge-soft px-2 py-1">Actif — {{ acces.profil }}</span>
+              {% elif acces %}
+                <span class="badge bg-secondary">Inactif — {{ acces.profil }}</span>
+              {% else %}
+                <span class="badge bg-secondary">Aucun accès</span>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="text-center text-muted">Aucun agent dans cette direction.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-description-profils" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Profils de cette application</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% for nom_profil, info in profils.items %}
+          <div class="mb-3">
+            <h6 class="mb-1">{{ nom_profil }}</h6>
+            <p class="text-muted small mb-1">{{ info.description }}</p>
+            <ul class="small mb-0">
+              {% for droit in info.droits %}
+                <li>{{ droit }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% if not forloop.last %}<hr>{% endif %}
+        {% empty %}
+          <p class="text-muted">Aucun profil défini pour cette application.</p>
+        {% endfor %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>

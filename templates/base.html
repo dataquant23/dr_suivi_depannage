@@ -1,0 +1,158 @@
+{% load static depannage_extras %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titre %}Gestion des dépannages{% endblock %}</title>
+  <meta name="theme-color" content="#f7f8f4">
+  <link rel="icon" href="{% static 'img/Logo_CIE.jpg' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  {% block entete_extra %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<div class="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="marque">
+      <div class="logo cie"><img src="{% static 'img/Logo_CIE.jpg' %}" alt="CIE"></div>
+      <div>
+        <strong>Suivi &amp; gestion<br>des dépannages</strong>
+      </div>
+    </div>
+
+    <nav>
+      {% if user|peut_saisir %}
+      <a href="{% url 'depannages:saisie' %}" class="{% if rubrique == 'saisie' %}actif{% endif %}">
+        <span class="ico i-plus" aria-hidden="true"></span> Nouvelle saisie
+      </a>
+      {% endif %}
+      <a href="{% url 'depannages:travaux_en_cours' %}" class="{% if rubrique == 'travaux' %}actif{% endif %}">
+        <span class="ico i-clipboard" aria-hidden="true"></span> Travaux en cours
+        {% if nb_travaux_en_cours %}<span class="pastille">{{ nb_travaux_en_cours }}</span>{% endif %}
+      </a>
+      <a href="{% url 'depannages:dossiers_clotures' %}" class="{% if rubrique == 'clotures' %}actif{% endif %}">
+        <span class="ico i-check" aria-hidden="true"></span> Dossiers clôturés
+      </a>
+      <a href="{% url 'depannages:carte' %}" class="{% if rubrique == 'carte' %}actif{% endif %}">
+        <span class="ico i-map" aria-hidden="true"></span> Carte
+      </a>
+      <a href="{% url 'depannages:tableau_bord' %}" class="{% if rubrique == 'tableau_bord' %}actif{% endif %}">
+        <span class="ico i-chart" aria-hidden="true"></span> Récapitulatif
+      </a>
+      {% if user|est_responsable %}
+        <div class="titre-groupe">Supervision</div>
+        <a href="{% url 'depannages:alertes' %}" class="{% if rubrique == 'alertes' %}actif{% endif %}">
+          <span class="ico i-alert" aria-hidden="true"></span> Alertes
+          {% if nb_alertes %}<span class="pastille">{{ nb_alertes }}</span>{% endif %}
+        </a>
+        <a href="{% url 'referentiel:administration' %}" class="{% if rubrique == 'admin' %}actif{% endif %}">
+          <span class="ico i-settings" aria-hidden="true"></span> Paramètres
+        </a>
+      {% endif %}
+      {% if user|est_admin %}
+        <a href="{% url 'referentiel:utilisateurs' %}" class="{% if rubrique == 'utilisateurs' %}actif{% endif %}">
+          <span class="ico i-user" aria-hidden="true"></span> Utilisateurs
+        </a>
+      {% endif %}
+      {% if user.profil == 'Direction régionale' or user.profil == 'Responsable commercial' %}
+        <a href="{% url 'comptes:gestion_acces' %}" class="{% if rubrique == 'acces' %}actif{% endif %}">
+          <span class="ico i-user" aria-hidden="true"></span> Gestion des accès
+        </a>
+      {% endif %}
+    </nav>
+
+    <div class="pied">
+      <a href="{% url 'comptes:profil' %}" class="profil-sidebar">
+        <span class="avatar">{{ user|initiales_agent }}</span>
+        <span>
+          <strong>{{ user.display_name }}</strong>
+          <small>{{ user|profil_depannage|default:"Aucun accès" }}</small>
+        </span>
+      </a>
+      <a href="{% url 'comptes:deconnexion' %}" class="btn-deconnexion">Déconnexion</a>
+    </div>
+  </aside>
+
+  <div class="principal">
+    <header class="entete">
+      <div class="entete-titre-bloc">
+        {% block titre_icone %}{% endblock %}
+        <div>
+          <h1>{% block titre_page %}Tableau de bord{% endblock %}</h1>
+          {% block sous_titre %}{% endblock %}
+        </div>
+      </div>
+
+      {% block actions_entete %}{% endblock %}
+      <a href="{% url 'comptes:profil' %}" class="avatar-mobile-entete">{{ user|initiales_agent }}</a>
+    </header>
+
+    <main class="contenu">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+      {% block contenu %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<nav class="barre-mobile">
+  {% if user|peut_saisir %}
+  <a href="{% url 'depannages:saisie' %}" class="{% if rubrique == 'saisie' %}actif{% endif %}">
+    <span class="ico i-plus" aria-hidden="true"></span>Saisie</a>
+  {% endif %}
+  <a href="{% url 'depannages:travaux_en_cours' %}" class="{% if rubrique == 'travaux' %}actif{% endif %}">
+    <span class="ico i-clipboard" aria-hidden="true"></span>Travaux</a>
+  {% if user|est_responsable %}
+    <a href="{% url 'depannages:carte' %}" class="{% if rubrique == 'carte' %}actif{% endif %}">
+      <span class="ico i-map" aria-hidden="true"></span>Carte</a>
+    <a href="{% url 'depannages:tableau_bord' %}" class="{% if rubrique == 'tableau_bord' %}actif{% endif %}">
+      <span class="ico i-chart" aria-hidden="true"></span>Récap</a>
+    <button type="button" id="bouton-plus-mobile"
+            class="{% if rubrique == 'alertes' or rubrique == 'clotures' or rubrique == 'admin' or rubrique == 'utilisateurs' %}actif{% endif %}"
+            aria-haspopup="true" aria-expanded="false">
+      <span class="ico i-chevron" aria-hidden="true" style="transform:rotate(-90deg)"></span>Plus
+      {% if nb_alertes %}<span class="pastille">{{ nb_alertes }}</span>{% endif %}
+    </button>
+  {% else %}
+    <a href="{% url 'depannages:dossiers_clotures' %}" class="{% if rubrique == 'clotures' %}actif{% endif %}">
+      <span class="ico i-check" aria-hidden="true"></span>Clôturés</a>
+    <a href="{% url 'depannages:carte' %}" class="{% if rubrique == 'carte' %}actif{% endif %}">
+      <span class="ico i-map" aria-hidden="true"></span>Carte</a>
+    <a href="{% url 'depannages:tableau_bord' %}" class="{% if rubrique == 'tableau_bord' %}actif{% endif %}">
+      <span class="ico i-chart" aria-hidden="true"></span>Récap</a>
+  {% endif %}
+</nav>
+
+{% if user|est_responsable %}
+  <div class="plus-mobile-fond" id="plus-mobile-fond" hidden></div>
+  <div class="plus-mobile-feuille" id="plus-mobile-feuille" hidden>
+    <a href="{% url 'depannages:alertes' %}" class="{% if rubrique == 'alertes' %}actif{% endif %}">
+      <span class="ico i-alert" aria-hidden="true"></span>
+      <span>Alertes</span>
+      {% if nb_alertes %}<span class="pastille">{{ nb_alertes }}</span>{% endif %}
+    </a>
+    <a href="{% url 'depannages:dossiers_clotures' %}" class="{% if rubrique == 'clotures' %}actif{% endif %}">
+      <span class="ico i-check" aria-hidden="true"></span>
+      <span>Dossiers clôturés</span>
+    </a>
+    <a href="{% url 'referentiel:administration' %}" class="{% if rubrique == 'admin' %}actif{% endif %}">
+      <span class="ico i-settings" aria-hidden="true"></span>
+      <span>Paramètres</span>
+    </a>
+    {% if user|est_admin %}
+      <a href="{% url 'referentiel:utilisateurs' %}" class="{% if rubrique == 'utilisateurs' %}actif{% endif %}">
+        <span class="ico i-user" aria-hidden="true"></span>
+        <span>Utilisateurs</span>
+      </a>
+    {% endif %}
+  </div>
+{% endif %}
+
+<script src="{% static 'js/lightbox.js' %}"></script>
+<script src="{% static 'js/menu-plus.js' %}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% load depannage_extras %}
+
+{% block titre %}Tableau de bord{% endblock %}
+{% block titre_page %}Tableau de bord{% endblock %}
+{% block titre_icone %}<span class="entete-icone"><span class="ico i-chart" aria-hidden="true"></span></span>{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Vue d'ensemble des dossiers de dépannage et des indicateurs clés.</p>{% endblock %}
+
+{% block actions_entete %}
+  <form method="get" class="filtres-entete">
+    <input type="hidden" name="periode" value="{{ periode }}">
+    <div class="segmente-entete">
+      <button type="submit" name="periode" value="semaine" class="{% if periode == 'semaine' %}actif{% endif %}">Semaine</button>
+      <button type="submit" name="periode" value="mois" class="{% if periode == 'mois' %}actif{% endif %}">Mois</button>
+      <button type="submit" name="periode" value="personnalisee" class="{% if periode == 'personnalisee' %}actif{% endif %}">Période</button>
+    </div>
+    <input type="date" name="debut" value="{{ debut|date:'Y-m-d' }}">
+    <input type="date" name="fin" value="{{ fin|date:'Y-m-d' }}">
+    <select name="secteur">
+      <option value="">Tous les secteurs</option>
+      {% for s in secteurs %}
+        <option value="{{ s.pk }}" {% if request.GET.secteur == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.libelle }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn petit">Appliquer</button>
+  </form>
+  <a class="btn petit"
+     href="{% url 'depannages:recapitulatif' %}?periode={{ periode }}&debut={{ debut|date:'Y-m-d' }}&fin={{ fin|date:'Y-m-d' }}{% if request.GET.secteur %}&secteur={{ request.GET.secteur }}{% endif %}&export=pdf">
+    <span class="btn-symbol i-download" aria-hidden="true"></span> Bilan
+  </a>
+  <a class="btn secondaire petit icone"
+     href="{% url 'depannages:recapitulatif' %}?periode={{ periode }}&debut={{ debut|date:'Y-m-d' }}&fin={{ fin|date:'Y-m-d' }}{% if request.GET.secteur %}&secteur={{ request.GET.secteur }}{% endif %}&export=detail_excel"
+     title="Télécharger le détail des dossiers (Excel)" aria-label="Télécharger le détail des dossiers (Excel)">
+    <span class="btn-symbol i-download" aria-hidden="true"></span>
+  </a>
+{% endblock %}
+
+{% block contenu %}
+
+<div class="grille kpi kpi-compact" style="margin-bottom:18px">
+  <div class="kpi-tuile bleu">
+    <div class="kpi-icone"><span class="ico i-clipboard" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ nb_nouveaux }}</div>
+      <div class="libelle">Nouveaux</div>
+      <div class="detail">dernières 24 h</div>
+    </div>
+  </div>
+  <div class="kpi-tuile orange">
+    <div class="kpi-icone"><span class="ico i-clock" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ nb_provisoires }}</div>
+      <div class="libelle">Dossiers à clôturer</div>
+    </div>
+  </div>
+  <div class="kpi-tuile rouge">
+    <div class="kpi-icone"><span class="ico i-bolt" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ nb_compteurs_clotures }}</div>
+      <div class="libelle">Compteurs clôturés</div>
+    </div>
+  </div>
+  <div class="kpi-tuile vert">
+    <div class="kpi-icone"><span class="ico i-check" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ nb_clotures_mois }}</div>
+      <div class="libelle">Clôtures</div>
+    </div>
+  </div>
+  <div class="kpi-tuile bleu">
+    <div class="kpi-icone"><span class="ico i-target" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ delai_moyen }} h</div>
+      <div class="libelle">Délai moyen</div>
+    </div>
+  </div>
+  {% if user|est_responsable %}
+  <div class="kpi-tuile rouge">
+    <div class="kpi-icone"><span class="ico i-bolt" aria-hidden="true"></span></div>
+    <div>
+      <div class="valeur">{{ hors_delai_clotures }}</div>
+      <div class="libelle">Clôtures hors délai</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="grille deux recap-grille" style="margin-bottom:18px">
+  <div class="carte" id="carte-secteur-equip">
+    <div class="titre">
+      <h2>Demandes créées et taux de traitement</h2>
+    </div>
+    <div class="corps">
+      {% if cartes_secteur_equipement %}
+        <div class="graphe-secteur-equip-entete">
+          <select id="selecteur-secteur-graphe">
+            {% for bloc in cartes_secteur_equipement %}
+              <option value="{{ forloop.counter0 }}">{{ bloc.secteur.libelle }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% for bloc in cartes_secteur_equipement %}
+          <div class="graphe-secteur-equip" data-index="{{ forloop.counter0 }}" {% if not forloop.first %}hidden{% endif %}>
+            <div class="graphe-secteur-equip-colonnes">
+              <span>Équipement</span>
+              <span>Demandes</span>
+              <span>Taux</span>
+              <span>Délai moyen</span>
+            </div>
+            {% for e in bloc.equipements %}
+              <div class="ligne-graphe-secteur-equip">
+                <span class="nom-equip">{{ e.libelle }}</span>
+                <span class="total-cree-seul">{{ e.crees }}</span>
+                <span class="taux-equip {{ e.classe_taux }}">
+                  {% if e.taux != None %}{{ e.taux }} %{% else %}—{% endif %}
+                </span>
+                <span class="delai-equip {{ e.classe_taux }}">
+                  {% if e.delai_h != None %}{{ e.delai_h|jours_heures }}{% else %}—{% endif %}
+                </span>
+              </div>
+            {% empty %}
+              <p class="aide">Aucun équipement sur cette période.</p>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="aide">Aucune donnée sur cette période.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="carte">
+    <div class="titre">
+      <h2>Alertes à traiter</h2>
+      {% if user|est_responsable %}
+        <a href="{% url 'depannages:alertes' %}" class="lien">Voir tout</a>
+      {% endif %}
+    </div>
+    <div class="corps corps-scroll" style="padding:0">
+      {% for depannage in alertes %}
+        <div class="ligne-travail" style="border-left-width:4px">
+          <div class="bt">BT {{ depannage.numero_bt }}</div>
+          <div>
+            <span class="badge {% if depannage.est_shunte %}rouge{% else %}orange{% endif %}">
+              {{ depannage.get_categorie_provisoire_display }}
+            </span>
+          </div>
+          <div class="secteur">{{ depannage.secteur.libelle|default:"Réseau" }}</div>
+          <div class="temps">
+            <strong style="color:var(--rouge)">+{{ depannage.retard_heures }} h</strong>
+          </div>
+          <div class="actions">
+            <a href="{{ depannage.get_absolute_url }}" class="btn secondaire petit">Ouvrir</a>
+          </div>
+        </div>
+      {% empty %}
+        <div class="vide">
+          <span class="ico">&#10003;</span>
+          Aucun délai dépassé.
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="grille deux recap-grille-secondaire">
+  <div class="carte">
+    <div class="titre"><h2>Par secteur</h2></div>
+    <div class="corps">
+      <div class="barres">
+        {% for ligne in repartition_secteur %}
+          <div class="barre-ligne">
+            <span>{{ ligne.secteur__libelle|default:"Réseau" }}</span>
+            <div class="barre-piste"><span style="width:{% widthratio ligne.total repartition_secteur.0.total 100 %}%"></span></div>
+            <span class="val">{{ ligne.total }}</span>
+          </div>
+        {% empty %}
+          <p class="aide">Aucune donnée sur cette période.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="carte">
+    <div class="titre"><h2>Par quartier</h2></div>
+    <div class="corps">
+      <div class="barres">
+        {% for ligne in par_quartier %}
+          <div class="barre-ligne">
+            <span title="{{ ligne.commune__nom }}">{{ ligne.quartier__nom }}</span>
+            <div class="barre-piste"><span style="width:{% widthratio  ligne.total par_quartier.0.total 100 %}%"></span></div>
+            <span class="val">{{ ligne.total }}</span>
+          </div>
+        {% empty %}
+          <p class="aide">Aucun dossier rattaché à un quartier.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Bascule le graphe "Demandes créées et taux de traitement" d un secteur
+// a l autre : un seul bloc .graphe-secteur-equip visible a la fois, comme
+// pour les onglets ailleurs sur le site.
+const selecteurSecteurGraphe = document.getElementById("selecteur-secteur-graphe");
+if (selecteurSecteurGraphe) {
+  const blocsGrapheSecteur = document.querySelectorAll(".graphe-secteur-equip");
+  selecteurSecteurGraphe.addEventListener("change", () => {
+    blocsGrapheSecteur.forEach(bloc => {
+      bloc.hidden = bloc.dataset.index !== selecteurSecteurGraphe.value;
+    });
+  });
+}
+</script>
+{% endblock %}

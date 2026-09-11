@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block titre %}Délais de traitement{% endblock %}
+{% block titre_page %}Délais de traitement{% endblock %}
+
+{% block contenu %}
+<div class="fil"><a href="{% url 'referentiel:administration' %}">Paramètres</a> / Délais</div>
+
+<div class="grille deux">
+  <div class="carte">
+    <div class="titre"><h2>Modifier les délais</h2></div>
+    <div class="corps">
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="champ">
+          <label for="{{ form.delai_compteur_shunte.id_for_label }}">
+            Compteur shunté <span class="badge rouge">critique</span>
+          </label>
+          {{ form.delai_compteur_shunte }}
+          <div class="aide">Délai en heures avant alerte de dépassement.</div>
+          {% for e in form.delai_compteur_shunte.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="champ">
+          <label for="{{ form.delai_sans_electricite.id_for_label }}">
+            Client sans électricité <span class="badge orange">prioritaire</span>
+          </label>
+          {{ form.delai_sans_electricite }}
+          {% for e in form.delai_sans_electricite.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="champ">
+          <label for="{{ form.delai_autre_equipement.id_for_label }}">Autres équipements</label>
+          {{ form.delai_autre_equipement }}
+          {% for e in form.delai_autre_equipement.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="champ">
+          <label for="{{ form.seuil_alerte_pct.id_for_label }}">Seuil d'alerte anticipée (%)</label>
+          {{ form.seuil_alerte_pct }}
+          <div class="aide">
+            Au-delà de ce pourcentage du délai, le dossier passe en « échéance proche ».
+          </div>
+          {% for e in form.seuil_alerte_pct.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="champ">
+          <span class="etiquette">Appliquer aux dossiers déjà ouverts</span>
+          <div class="cases colonnes">
+            {% for choix in form.appliquer_dossiers_ouverts %}
+              <label class="case">{{ choix.tag }}<span>{{ choix.choice_label }}</span></label>
+            {% endfor %}
+          </div>
+          <div class="aide">
+            Par défaut, les nouveaux délais ne concernent que les prochains dossiers.
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <a href="{% url 'referentiel:administration' %}" class="btn secondaire">Annuler</a>
+          <button type="submit" class="btn" style="flex:1">Valider</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="carte">
+    <div class="titre"><h2>Journal des modifications</h2></div>
+    <div class="corps" style="padding:0 18px">
+      <div class="chrono">
+        {% for ligne in historique %}
+          <div class="etape">
+            <span class="quand">{{ ligne.modifie_le|date:"d/m/Y H:i" }}</span>
+            <div>
+              <strong>{{ ligne.champ }}</strong>
+              <div class="aide">
+                {{ ligne.ancienne_valeur }} &rarr; {{ ligne.nouvelle_valeur }}
+                {% if ligne.modifie_par %} &middot; par {{ ligne.modifie_par }}{% endif %}
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <div class="vide">Aucune modification enregistrée.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block titre %}Gestion des accès{% endblock %}
+{% block titre_page %}Gestion des accès{% endblock %}
+{% block titre_icone %}<span class="entete-icone"><span class="ico i-user" aria-hidden="true"></span></span>{% endblock %}
+{% block sous_titre %}<p class="entete-sous-titre">Attribuer le rôle dépannage de chaque agent.</p>{% endblock %}
+
+{% block contenu %}
+
+<div class="carte" style="margin-bottom:18px">
+  <div class="corps" style="display:flex;justify-content:flex-end">
+    <button type="button" class="btn secondaire" onclick="document.getElementById('modal-profils').style.display='flex'">
+      Description des profils
+    </button>
+  </div>
+</div>
+
+<div class="carte">
+  <div class="tableau-conteneur">
+    <table class="tableau">
+      <thead>
+        <tr><th>Matricule</th><th>Agent</th><th>Fonction</th><th colspan="2">Rôle dépannage</th></tr>
+      </thead>
+      <tbody>
+        {% for agent, acces in lignes %}
+          <tr>
+            <td>{{ agent.matricule }}</td>
+            <td>{{ agent.display_name }}</td>
+            <td>{{ agent.fonction|default:"-" }}</td>
+            <td colspan="2">
+              <form method="post" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+                {% csrf_token %}
+                <input type="hidden" name="agent_id" value="{{ agent.pk }}">
+                <select name="profil" class="form-select" style="min-width:180px">
+                  {% for nom_profil, info in profils.items %}
+                    <option value="{{ nom_profil }}" {% if acces.profil == nom_profil %}selected{% endif %}>{{ nom_profil }}</option>
+                  {% endfor %}
+                </select>
+                <label class="case" style="max-width:140px">
+                  <input type="checkbox" name="actif" value="1" {% if acces.actif %}checked{% endif %}>
+                  <span>Accès actif</span>
+                </label>
+                <button type="submit" class="btn secondaire petit">Enregistrer</button>
+                {% if acces.actif %}
+                  <span class="badge vert">Actif — {{ acces.profil }}</span>
+                {% elif acces %}
+                  <span class="badge gris">Inactif — {{ acces.profil }}</span>
+                {% else %}
+                  <span class="badge gris">Aucun accès</span>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="vide">Aucun agent.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="modal-profils" style="display:none;position:fixed;inset:0;background:rgba(15,23,20,.45);align-items:center;justify-content:center;z-index:1000">
+  <div class="carte" style="max-width:560px;width:92%;max-height:80vh;overflow-y:auto">
+    <div class="titre" style="display:flex;justify-content:space-between;align-items:center">
+      <h2>Profils de l'application dépannage</h2>
+      <button type="button" class="btn secondaire petit" onclick="document.getElementById('modal-profils').style.display='none'">Fermer</button>
+    </div>
+    <div class="corps">
+      {% for nom_profil, info in profils.items %}
+        <div style="margin-bottom:14px">
+          <strong>{{ nom_profil }}</strong>
+          <p class="aide" style="margin:2px 0 6px">{{ info.description }}</p>
+          <ul class="aide" style="margin:0;padding-left:18px">
+            {% for droit in info.droits %}<li>{{ droit }}</li>{% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

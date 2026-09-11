@@ -1,0 +1,20 @@
+{% extends "comptes/base_auth.html" %}
+
+{% block titre %}Mot de passe modifié{% endblock %}
+{% block entete %}Mot de passe modifié{% endblock %}
+{% block sous_titre %}Vous pouvez vous connecter{% endblock %}
+
+{% block contenu %}
+  <div class="message success" style="margin:0 0 16px">
+    Votre mot de passe a été enregistré.
+  </div>
+
+  <p class="aide" style="margin:0 0 16px">
+    Connectez-vous avec votre identifiant et votre nouveau mot de passe. Vous
+    pourrez ensuite activer la connexion par empreinte depuis votre profil.
+  </p>
+
+  <div style="text-align:center">
+    <a href="{% url 'comptes:connexion' %}" class="btn large">Se connecter</a>
+  </div>
+{% endblock %}

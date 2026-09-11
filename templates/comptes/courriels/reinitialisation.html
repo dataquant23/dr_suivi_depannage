@@ -1,0 +1,41 @@
+{% autoescape on %}<div style="font-family:'Segoe UI',Arial,sans-serif;background:#f5f7f3;padding:24px;">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e3e9e0;border-radius:12px;overflow:hidden;">
+
+    <div style="background:#0f6f3f;padding:20px 26px;">
+      <div style="color:#ffffff;font-size:17px;font-weight:700;">Gestion des dépannages</div>
+      <div style="color:#cfe8d7;font-size:12px;margin-top:3px;">Compagnie Ivoirienne d'Électricité</div>
+    </div>
+    <div style="height:3px;background:#ee7d0f;"></div>
+
+    <div style="padding:24px 26px;color:#132318;font-size:14px;line-height:1.6;">
+      <p style="margin:0 0 14px;">
+        Bonjour {{ user.get_full_name|default:user.username }},
+      </p>
+      <p style="margin:0 0 20px;">
+        Une réinitialisation de mot de passe a été demandée pour le compte
+        <strong>{{ user.username }}</strong>.
+      </p>
+
+      <p style="margin:0 0 22px;text-align:center;">
+        <a href="{{ protocol }}://{{ domain }}{% url 'comptes:mot_de_passe_reinitialiser' uidb64=uid token=token %}"
+           style="display:inline-block;background:#0f6f3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;">
+          Choisir un nouveau mot de passe
+        </a>
+      </p>
+
+      <p style="margin:0 0 14px;padding:11px 14px;background:#fdf0de;border-left:3px solid #ee7d0f;font-size:13px;">
+        Ce lien est valable <strong>2 heures</strong> et ne peut servir qu'une
+        seule fois.
+      </p>
+
+      <p style="margin:0;font-size:12.5px;color:#5b6b5f;">
+        Si vous n'êtes pas à l'origine de cette demande, ignorez ce message :
+        votre mot de passe actuel reste inchangé.
+      </p>
+    </div>
+
+    <div style="padding:14px 26px;background:#f5f7f3;border-top:1px solid #e3e9e0;color:#8c978b;font-size:11.5px;">
+      Message automatique, merci de ne pas y répondre.
+    </div>
+  </div>
+</div>{% endautoescape %}

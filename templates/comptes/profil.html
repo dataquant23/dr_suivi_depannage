@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load static depannage_extras %}
+
+{% block titre %}Mon profil{% endblock %}
+{% block titre_page %}Mon profil{% endblock %}
+
+{% block contenu %}
+<div class="grille deux">
+  <div>
+    <div class="carte" style="margin-bottom:16px">
+      <div class="titre"><h2>Mes informations</h2></div>
+      <div class="corps">
+        <dl class="paire">
+          <dt>Nom</dt><dd>{{ user.display_name }}</dd>
+          <dt>Matricule</dt><dd>{{ user.matricule }}</dd>
+          <dt>Rôle dépannage</dt><dd><span class="badge bleu">{{ user|profil_depannage|default:"Aucun accès" }}</span></dd>
+          <dt>Structure</dt><dd>{{ user.affectation_depannage.structure.libelle|default:"-" }}</dd>
+          <dt>Secteurs</dt>
+          <dd>
+            {% for secteur in user.affectation_depannage.secteurs.all %}
+              <span class="badge gris">{{ secteur.libelle }}</span>
+            {% empty %}
+              <span class="aide">Tous les secteurs de la structure</span>
+            {% endfor %}
+          </dd>
+          {% if user.affectation_depannage.telephone %}<dt>Téléphone</dt><dd>{{ user.affectation_depannage.telephone }}</dd>{% endif %}
+          {% if user.email %}<dt>E-mail</dt><dd>{{ user.email }}</dd>{% endif %}
+        </dl>
+      </div>
+    </div>
+
+    <div class="carte" style="margin-bottom:16px">
+      <div class="titre"><h2>Mot de passe</h2></div>
+      <div class="corps">
+        <p class="aide" style="margin-top:0">
+          {% if user.must_change_password %}
+            Vous utilisez encore le mot de passe provisoire reçu par courriel.
+          {% elif user.last_login %}
+            Dernière connexion le {{ user.last_login|date:"d/m/Y à H:i" }}.
+          {% endif %}
+        </p>
+        <a href="{% url 'comptes:changer_mot_de_passe' %}" class="btn secondaire">
+          Changer mon mot de passe
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <!-- Enrôlement WebAuthn : la clé privée reste dans le téléphone -->
+    <div class="carte" style="margin-bottom:16px">
+      <div class="titre"><h2><img src="{% static 'img/fingerprint.svg' %}" alt="" class="titre-icone"> Connexion par empreinte</h2></div>
+      <div class="corps">
+        <div id="zone-message"></div>
+
+        <p class="aide" style="margin-top:0">
+          Activez le déverrouillage par empreinte sur ce téléphone. Votre empreinte
+          reste dans l'appareil : l'application n'en reçoit jamais aucune donnée.
+          Le mot de passe reste utilisable à tout moment.
+        </p>
+
+        <div id="bloc-activation">
+          <button type="button" class="bouton-empreinte" id="btn-activer"
+                  data-url-debut="{% url 'comptes:webauthn_enrolement_debut' %}"
+                  data-url-fin="{% url 'comptes:webauthn_enrolement_fin' %}">
+            <img src="{% static 'img/fingerprint.svg' %}" alt="" class="empreinte-icone"> Activer sur cet appareil
+          </button>
+        </div>
+        <div id="bloc-indisponible" style="display:none">
+          <div class="message warning">
+            Ce navigateur ou ce téléphone ne gère pas la connexion par empreinte.
+            Utilisez votre mot de passe.
+          </div>
+        </div>
+
+        {% if cles %}
+          <div style="margin-top:18px">
+            <span class="etiquette">Appareils enrôlés</span>
+            {% for cle in cles %}
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9">
+                <span>&#128241;</span>
+                <div style="flex:1">
+                  <strong style="font-size:13px">{{ cle.libelle_appareil }}</strong>
+                  <div class="aide">
+                    Activé le {{ cle.cree_le|date:"d/m/Y" }}
+                    {% if cle.derniere_utilisation %}
+                      &middot; dernière connexion {{ cle.derniere_utilisation|date:"d/m/Y H:i" }}
+                    {% endif %}
+                  </div>
+                </div>
+                <form method="post" action="{% url 'comptes:webauthn_supprimer' cle.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn secondaire petit">Retirer</button>
+                </form>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <a href="{% url 'comptes:deconnexion' %}" class="btn secondaire" style="width:100%">
+      Se déconnecter
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/profil-empreinte.js' %}"></script>
+{% endblock %}

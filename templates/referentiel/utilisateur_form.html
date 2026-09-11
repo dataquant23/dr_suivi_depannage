@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block titre %}{% if creation %}Nouvel utilisateur{% else %}Modifier {{ utilisateur_edite.display_name }}{% endif %}{% endblock %}
+{% block titre_page %}{% if creation %}Nouvel utilisateur{% else %}Périmètre de {{ utilisateur_edite.display_name }}{% endif %}{% endblock %}
+
+{% block contenu %}
+<div class="fil">
+  <a href="{% url 'referentiel:utilisateurs' %}">Utilisateurs</a> /
+  {% if creation %}Nouveau{% else %}{{ utilisateur_edite.display_name }}{% endif %}
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="grille deux">
+    {% if creation %}
+    <div>
+      <div class="carte" style="margin-bottom:16px">
+        <div class="titre"><h2>Identité</h2></div>
+        <div class="corps">
+          <div class="champ">
+            <label for="{{ form.matricule.id_for_label }}">Matricule <span class="obligatoire">*</span></label>
+            {{ form.matricule }}
+            {% for e in form.matricule.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="champ">
+            <label for="{{ form.nom.id_for_label }}">Nom</label>
+            {{ form.nom }}
+          </div>
+          <div class="champ">
+            <label for="{{ form.prenoms.id_for_label }}">Prénoms</label>
+            {{ form.prenoms }}
+          </div>
+          <div class="champ">
+            <label for="{{ form.fonction.id_for_label }}">Fonction</label>
+            {{ form.fonction }}
+          </div>
+          <div class="champ">
+            <label for="{{ form.telephone.id_for_label }}">Téléphone</label>
+            {{ form.telephone }}
+          </div>
+          <div class="champ">
+            <label for="{{ form.email.id_for_label }}">Email <span class="obligatoire">*</span></label>
+            {{ form.email }}
+            {% for e in form.email.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div>
+      <div class="carte" style="margin-bottom:16px">
+        <div class="titre"><h2>Rôle et périmètre</h2></div>
+        <div class="corps">
+          <div class="champ">
+            <label for="{{ form.profil.id_for_label }}">Rôle dépannage <span class="obligatoire">*</span></label>
+            {{ form.profil }}
+            <div class="aide">
+              Dépanneur : saisie terrain. Agent DCRD : activités transmises à la DC.
+              Responsable : supervision et délais. Administration : accès et périmètre.
+            </div>
+            {% for e in form.profil.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="champ">
+            <label for="{{ form.structure.id_for_label }}">Structure de rattachement</label>
+            {{ form.structure }}
+            {% for e in form.structure.errors %}<div class="erreur-champ">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="champ">
+            <span class="etiquette">Secteurs visibles</span>
+            <div class="cases colonnes" style="max-height:260px;overflow-y:auto">
+              {% for choix in form.secteurs %}
+                <label class="case">{{ choix.tag }}<span>{{ choix.choice_label }}</span></label>
+              {% endfor %}
+            </div>
+            <div class="aide">
+              Laisser tout décoché pour donner accès à tous les secteurs de la structure.
+            </div>
+          </div>
+
+          {% if not creation %}
+          <div class="champ">
+            <label for="{{ form.telephone.id_for_label }}">Téléphone</label>
+            {{ form.telephone }}
+          </div>
+          {% endif %}
+
+          <div class="champ">
+            <label class="case" style="max-width:220px">
+              {{ form.actif }}<span>Accès dépannage actif</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <a href="{% url 'referentiel:utilisateurs' %}" class="btn secondaire">Annuler</a>
+        <button type="submit" class="btn {% if creation %}orange{% endif %}" style="flex:1">
+          {% if creation %}Créer le compte{% else %}Enregistrer{% endif %}
+        </button>
+      </div>
+
+      {% if creation %}
+        <p class="aide" style="margin-top:12px">
+          Un mot de passe provisoire est généré automatiquement et envoyé à
+          l'adresse e-mail indiquée. L'agent devra le remplacer à sa première
+          connexion, puis pourra activer l'empreinte depuis son profil.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+</form>
+{% endblock %}

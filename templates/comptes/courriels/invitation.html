@@ -1,0 +1,61 @@
+{% autoescape on %}<div style="font-family:'Segoe UI',Arial,sans-serif;background:#f5f7f3;padding:24px;">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e3e9e0;border-radius:12px;overflow:hidden;">
+
+    <div style="background:#0f6f3f;padding:20px 26px;">
+      <div style="color:#ffffff;font-size:17px;font-weight:700;">{{ application }}</div>
+      <div style="color:#cfe8d7;font-size:12px;margin-top:3px;">Compagnie Ivoirienne d'Électricité</div>
+    </div>
+    <div style="height:3px;background:#ee7d0f;"></div>
+
+    <div style="padding:24px 26px;color:#132318;font-size:14px;line-height:1.6;">
+      <p style="margin:0 0 14px;">
+        Bonjour {{ utilisateur.get_full_name|default:utilisateur.matricule }},
+      </p>
+      <p style="margin:0 0 18px;">
+        Un compte vient d'être ouvert pour vous sur l'application
+        <strong>{{ application }}</strong>.
+      </p>
+
+      <table style="width:100%;border-collapse:collapse;margin:0 0 20px;">
+        <tr>
+          <td style="padding:9px 12px;background:#f5f7f3;border:1px solid #e3e9e0;color:#5b6b5f;font-size:12px;width:46%;">
+            Identifiant (matricule)
+          </td>
+          <td style="padding:9px 12px;border:1px solid #e3e9e0;font-weight:700;font-size:14px;">
+            {{ utilisateur.matricule }}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:9px 12px;background:#f5f7f3;border:1px solid #e3e9e0;color:#5b6b5f;font-size:12px;">
+            Mot de passe provisoire
+          </td>
+          <td style="padding:9px 12px;border:1px solid #e3e9e0;font-family:Consolas,'Courier New',monospace;font-weight:700;font-size:15px;letter-spacing:.5px;">
+            {{ mot_de_passe }}
+          </td>
+        </tr>
+      </table>
+
+      <p style="margin:0 0 22px;text-align:center;">
+        <a href="{{ lien_connexion }}"
+           style="display:inline-block;background:#0f6f3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;">
+          Se connecter
+        </a>
+      </p>
+
+      <p style="margin:0 0 14px;">
+        À votre première connexion, l'application vous demandera de remplacer ce
+        mot de passe provisoire par un mot de passe personnel. Vous pourrez
+        ensuite activer la connexion par empreinte depuis votre profil.
+      </p>
+
+      <p style="margin:0;font-size:12.5px;color:#5b6b5f;">
+        Ce message contient vos accès : ne le transférez à personne et
+        supprimez-le une fois votre mot de passe changé.
+      </p>
+    </div>
+
+    <div style="padding:14px 26px;background:#f5f7f3;border-top:1px solid #e3e9e0;color:#8c978b;font-size:11.5px;">
+      Message automatique, merci de ne pas y répondre.
+    </div>
+  </div>
+</div>{% endautoescape %}

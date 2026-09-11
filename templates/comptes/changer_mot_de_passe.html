@@ -1,0 +1,77 @@
+{% extends "comptes/base_auth.html" %}
+
+{% block titre %}{% if user.must_change_password %}Activer votre compte{% else %}Changer le mot de passe{% endif %}{% endblock %}
+{% block entete %}{% if user.must_change_password %}Activer votre compte{% else %}Nouveau mot de passe{% endif %}{% endblock %}
+{% block sous_titre %}
+  {% if user.must_change_password %}Choisissez votre mot de passe personnel{% else %}Sécurité du compte{% endif %}
+{% endblock %}
+
+{% block contenu %}
+  {% if user.must_change_password %}
+    <p class="aide" style="margin:0 0 16px">
+      Vous vous êtes connecté avec le mot de passe provisoire reçu par courriel.
+      Choisissez maintenant un mot de passe que vous seul connaissez.
+    </p>
+  {% endif %}
+
+  <form method="post" class="formulaire-mot-passe ouvert" autocomplete="off">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+      <div class="message error">{{ form.non_field_errors|join:" " }}</div>
+    {% endif %}
+
+    {% for champ in form %}
+      <div class="champ">
+        <label for="{{ champ.id_for_label }}">{{ champ.label }}</label>
+        <div class="champ-mot-passe">
+          {{ champ }}
+          <button type="button" class="btn-voir-mot-passe" data-cible="{{ champ.id_for_label }}"
+                  aria-label="Afficher le mot de passe" aria-pressed="false">
+            <span class="ico i-eye" aria-hidden="true"></span>
+          </button>
+        </div>
+        {% if champ.errors %}
+          <div class="message error" style="margin-top:6px">{{ champ.errors|join:" " }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <div class="aide" style="margin:0 0 14px">
+      Au moins 10 caractères, différent de votre identifiant et pas un mot de
+      passe courant.
+    </div>
+
+    <button type="submit" class="btn large">Enregistrer</button>
+  </form>
+
+  {% if not user.must_change_password %}
+    <div style="margin-top:14px;text-align:center">
+      <a href="{% url 'comptes:profil' %}" class="btn secondaire">Retour au profil</a>
+    </div>
+  {% else %}
+    <div style="margin-top:14px;text-align:center">
+      <a href="{% url 'comptes:deconnexion' %}" class="aide">Se déconnecter</a>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Même bascule afficher/masquer que sur la page de connexion, appliquée à
+  // chacun des champs du formulaire.
+  document.querySelectorAll(".btn-voir-mot-passe").forEach(function (bouton) {
+    bouton.addEventListener("click", function () {
+      var champ = document.getElementById(this.dataset.cible);
+      if (!champ) return;
+      var visible = champ.type === "text";
+      champ.type = visible ? "password" : "text";
+      var icone = this.querySelector(".ico");
+      icone.classList.toggle("i-eye", visible);
+      icone.classList.toggle("i-eye-off", !visible);
+      this.setAttribute("aria-pressed", String(!visible));
+      this.setAttribute("aria-label", visible ? "Afficher le mot de passe" : "Masquer le mot de passe");
+    });
+  });
+</script>
+{% endblock %}
