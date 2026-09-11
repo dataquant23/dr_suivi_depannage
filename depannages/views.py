@@ -2,6 +2,7 @@ from collections import Counter, OrderedDict, defaultdict
 from datetime import timedelta
 from types import SimpleNamespace
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -487,6 +488,7 @@ def carte(request):
             "centre_lat": centre.latitude if centre else 5.3600,
             "centre_lon": centre.longitude if centre else -4.0083,
             "categories": CategorieProvisoire.choices,
+            "maptiler_key": settings.MAPTILER_KEY,
         },
     )
 

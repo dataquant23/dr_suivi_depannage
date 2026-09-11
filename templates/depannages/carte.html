@@ -44,7 +44,8 @@
 <div class="carte-stage" id="carte-stage"
      {% localize off %}data-centre-lat="{{ centre_lat }}" data-centre-lon="{{ centre_lon }}"{% endlocalize %}
      data-url-zones="{% url 'depannages:zones_geojson' %}"
-     data-url-donnees="{% url 'depannages:carte_donnees' %}">
+     data-url-donnees="{% url 'depannages:carte_donnees' %}"
+     data-maptiler-key="{{ maptiler_key }}">
   <div id="carte-leaflet" role="img" aria-label="Carte des dépannages en cours"></div>
 
   <!-- Outils flottants : position de référence et rayon de recherche -->

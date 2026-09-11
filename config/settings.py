@@ -183,6 +183,10 @@ WEBAUTHN_RP_ID = env("WEBAUTHN_RP_ID", default="localhost")
 WEBAUTHN_RP_NAME = env("WEBAUTHN_RP_NAME", default="Gestion des depannages")
 WEBAUTHN_ORIGIN = env("WEBAUTHN_ORIGIN", default="http://localhost:8000")
 
+# --- Fond de carte (MapTiler, compte gratuit) -------------------------------
+# Cle a restreindre par domaine dans le tableau de bord MapTiler.
+MAPTILER_KEY = env("MAPTILER_KEY", default="")
+
 # --- Cache ------------------------------------------------------------------
 # Compteur anti brute-force. Renseigner CACHE_URL (Redis...) dès qu'il y a
 # plus d'un worker, sinon le plafond est compté par processus.

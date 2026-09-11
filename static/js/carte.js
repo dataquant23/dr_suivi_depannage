@@ -49,10 +49,16 @@
     const ouverte = legende.classList.toggle("ouverte");
     boutonLegende.classList.toggle("actif", ouverte);
   });
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors",
-    maxZoom: 19,
-  }).addTo(carte);
+  // tile.openstreetmap.org interdit l'usage en production hors tests/perso
+  // (politique d'usage OSM) : MapTiler (compte gratuit, cle restreinte par
+  // domaine) fournit un fond equivalent sans etre bloque.
+  const cleMapTiler = stage.dataset.maptilerKey;
+  if (cleMapTiler) {
+    L.tileLayer(`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${cleMapTiler}`, {
+      attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(carte);
+  }
 
   // Un canevas de dimensions nulles au moment de l'initialisation Leaflet
   // produit une carte grise ; on force un recalcul une fois le CSS appliqué.
