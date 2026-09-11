@@ -130,7 +130,7 @@ PASSWORD_HASHERS = [
 ]
 
 LOGIN_URL = "comptes:connexion"
-LOGIN_REDIRECT_URL = "depannages:tableau_bord"
+LOGIN_REDIRECT_URL = "depannages:travaux_en_cours"
 LOGOUT_REDIRECT_URL = "comptes:connexion"
 
 # SSO inter-applications (voir core.sso).

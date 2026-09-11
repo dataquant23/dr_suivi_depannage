@@ -68,7 +68,7 @@ def connexion(request):
     return traite_connexion(
         request,
         "comptes/connexion.html",
-        reverse("depannages:tableau_bord"),
+        reverse("depannages:travaux_en_cours"),
         change_password_url_name="comptes:changer_mot_de_passe",
     )
 

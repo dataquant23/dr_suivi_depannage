@@ -314,7 +314,6 @@
 
   function afficherFiche(point) {
     fermerPopovers(null);
-    document.getElementById("repartition-zones").hidden = true;
     document.getElementById("liste-points").hidden = true;
     const fiche = document.getElementById("fiche-point");
     fiche.hidden = false;
@@ -360,7 +359,6 @@
 
   function masquerFiche() {
     document.getElementById("fiche-point").hidden = true;
-    document.getElementById("repartition-zones").hidden = false;
     document.getElementById("liste-points").hidden = false;
   }
 
@@ -389,11 +387,6 @@
     dernierPoints = donnees.points;
     groupes.clearLayers();
     document.getElementById("compte-total").textContent = donnees.total;
-
-    const zones = Object.entries(donnees.par_zone || {}).sort((a, b) => b[1] - a[1]);
-    document.getElementById("repartition-zones").innerHTML = zones.length
-      ? zones.map(([zone, nb]) => '<div class="ligne-zone"><span>' + zone + "</span><strong>" + nb + "</strong></div>").join("")
-      : "";
 
     const limites = [];
     const lignes = donnees.points.map((point) => {

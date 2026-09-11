@@ -95,7 +95,7 @@ class DepannageForm(forms.ModelForm):
         ]
         widgets = {
             "numero_bt": forms.TextInput(
-                attrs={"placeholder": "Ex. 24699", "inputmode": "numeric", "autofocus": True}
+                attrs={"placeholder": "Ex. 24699", "autofocus": True}
             ),
             "type_intervention": forms.RadioSelect,
             # Deduite en JS de la case "Compteur" (+ "shunte") plutot que
