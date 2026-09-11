@@ -34,15 +34,11 @@ if (window.PublicKeyCredential &&
 boutonEmpreinte?.addEventListener("click", async () => {
   const champBio = document.getElementById("matricule-bio");
   const champMotPasse = document.getElementById("id_matricule");
+  // Le matricule est un simple raccourci facultatif : sans lui, le téléphone
+  // propose directement les empreintes déjà enregistrées pour ce site.
   const identifiant = (champBio.value || champMotPasse.value || "").trim();
   if (!bioDisponible) {
     afficher("Connexion par empreinte indisponible sur cet appareil. Utilisez votre identifiant.", "warning");
-    document.getElementById("form-mot-passe").classList.add("ouvert");
-    champMotPasse.focus();
-    return;
-  }
-  if (!identifiant) {
-    afficher("Utilisez d'abord votre identifiant, puis activez l'empreinte dans le profil.", "warning");
     document.getElementById("form-mot-passe").classList.add("ouvert");
     champMotPasse.focus();
     return;
@@ -83,7 +79,7 @@ boutonEmpreinte?.addEventListener("click", async () => {
     });
     const resultat = await reponse.json();
     if (resultat.ok) {
-      localStorage.setItem("dernier_identifiant", identifiant);
+      localStorage.setItem("dernier_identifiant", resultat.matricule || identifiant);
       window.location.href = resultat.redirection;
     } else {
       afficher(resultat.erreur + " Utilisez votre mot de passe.", "error");

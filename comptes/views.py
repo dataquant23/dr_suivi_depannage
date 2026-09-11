@@ -193,27 +193,34 @@ def webauthn_supprimer(request, pk):
 @require_POST
 def webauthn_connexion_debut(request):
     matricule = json.loads(request.body or "{}").get("matricule", "").strip()
-    if not matricule:
-        return JsonResponse({"erreur": "Saisir le matricule."}, status=400)
+    agent = None
+    allow_credentials = []
 
-    agent = Agent.objects.filter(matricule__iexact=matricule, is_active=True).first()
-    if agent is None or not agent.cles_webauthn.exists():
-        # Message neutre : on n'indique pas si le compte existe.
-        return JsonResponse(
-            {"erreur": "Aucune empreinte enrôlée pour ce matricule sur ce service."},
-            status=404,
-        )
+    if matricule:
+        agent = Agent.objects.filter(matricule__iexact=matricule, is_active=True).first()
+        if agent is None or not agent.cles_webauthn.exists():
+            # Message neutre : on n'indique pas si le compte existe.
+            return JsonResponse(
+                {"erreur": "Aucune empreinte enrôlée pour ce matricule sur ce service."},
+                status=404,
+            )
+        allow_credentials = [
+            PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
+            for c in agent.cles_webauthn.all()
+        ]
+    # Sans matricule : connexion « sans identifiant », le téléphone propose
+    # directement les empreintes déjà enregistrées pour ce site (clé résidente).
 
     options = generate_authentication_options(
         rp_id=settings.WEBAUTHN_RP_ID,
-        allow_credentials=[
-            PublicKeyCredentialDescriptor(id=base64url_to_bytes(c.credential_id))
-            for c in agent.cles_webauthn.all()
-        ],
+        allow_credentials=allow_credentials,
         user_verification=UserVerificationRequirement.REQUIRED,
     )
     request.session[CLE_DEFI_CONNEXION] = _b64(options.challenge)
-    request.session[CLE_UTILISATEUR_CONNEXION] = agent.pk
+    if agent is not None:
+        request.session[CLE_UTILISATEUR_CONNEXION] = agent.pk
+    else:
+        request.session.pop(CLE_UTILISATEUR_CONNEXION, None)
     return JsonResponse(json.loads(options_to_json(options)))
 
 
@@ -221,15 +228,30 @@ def webauthn_connexion_debut(request):
 def webauthn_connexion_fin(request):
     defi = request.session.pop(CLE_DEFI_CONNEXION, None)
     agent_id = request.session.pop(CLE_UTILISATEUR_CONNEXION, None)
-    if not defi or not agent_id:
+    if not defi:
         return JsonResponse({"erreur": "Session de connexion expirée."}, status=400)
-
-    agent = Agent.objects.filter(pk=agent_id, is_active=True).first()
-    if agent is None:
-        return JsonResponse({"erreur": "Compte indisponible."}, status=400)
 
     corps = json.loads(request.body)
     credential = corps["credential"]
+
+    if agent_id:
+        agent = Agent.objects.filter(pk=agent_id, is_active=True).first()
+    else:
+        # Connexion sans identifiant : l'appareil désigne l'agent via userHandle
+        # (identifiant transmis à l'enrôlement, jamais une donnée biométrique).
+        userHandle = credential.get("response", {}).get("userHandle")
+        agent = None
+        if userHandle:
+            try:
+                pk = int(base64url_to_bytes(userHandle).decode("ascii"))
+            except (ValueError, UnicodeDecodeError):
+                pk = None
+            if pk is not None:
+                agent = Agent.objects.filter(pk=pk, is_active=True).first()
+
+    if agent is None:
+        return JsonResponse({"erreur": "Appareil non reconnu."}, status=400)
+
     cle = agent.cles_webauthn.filter(credential_id=credential["id"]).first()
     if cle is None:
         return JsonResponse({"erreur": "Appareil non reconnu."}, status=400)
@@ -252,4 +274,10 @@ def webauthn_connexion_fin(request):
     cle.save(update_fields=["sign_count", "derniere_utilisation"])
 
     login(request, agent, backend="core.backends.MatriculeBackend")
-    return JsonResponse({"ok": True, "redirection": "/"})
+    return JsonResponse(
+        {
+            "ok": True,
+            "matricule": agent.matricule,
+            "redirection": reverse(settings.LOGIN_REDIRECT_URL),
+        }
+    )
