@@ -10,6 +10,9 @@ urlpatterns = [
     path("", include("depannages.urls")),
 ]
 
+if settings.URL_PREFIX:
+    urlpatterns = [path(f"{settings.URL_PREFIX}/", include(urlpatterns))]
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

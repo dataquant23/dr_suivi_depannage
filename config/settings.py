@@ -29,15 +29,8 @@ TESTING = "test" in sys.argv or "pytest" in Path(sys.argv[0]).name
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
 
-# nginx est devant Django (proxy_pass) : sans ça, request.get_host() renvoie
-# l'hôte interne du proxy, pas le nom de domaine public.
 USE_X_FORWARDED_HOST = True
 
-# Préfixe de déploiement, ex. /dr_depannage pour nginx proxy_pass
-# /dr_depannage/ → Django / (le préfixe est retiré avant d'atteindre Django :
-# reverse()/{% url %} n'ont pas besoin de le connaître, seuls STATIC_URL et
-# MEDIA_URL le portent, car les fichiers statiques/médias sont demandés
-# directement à cette URL externe).
 BASE_PATH = env("BASE_PATH", default="/dr_depannage")
 
 
@@ -48,6 +41,7 @@ def _norm_base(chemin: str) -> str:
 
 
 _BASE = _norm_base(BASE_PATH)
+URL_PREFIX = _BASE
 
 INSTALLED_APPS = [
     "django.contrib.admin",
