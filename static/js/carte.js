@@ -49,11 +49,8 @@
     const ouverte = legende.classList.toggle("ouverte");
     boutonLegende.classList.toggle("actif", ouverte);
   });
-  // tile.openstreetmap.org interdit l'usage en production hors tests/perso
-  // (politique d'usage OSM) : CARTO fournit les mêmes données OSM sans clé API.
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    attribution: "&copy; OpenStreetMap &copy; CARTO",
-    subdomains: "abcd",
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
     maxZoom: 19,
   }).addTo(carte);
 
