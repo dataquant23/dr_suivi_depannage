@@ -5,6 +5,7 @@
 {% block titre_page %}Mon profil{% endblock %}
 
 {% block contenu %}
+{% csrf_token %}
 <div class="grille deux">
   <div>
     <div class="carte" style="margin-bottom:16px">
