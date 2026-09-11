@@ -51,8 +51,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
-    # Socle partagé django_dran (agents, droits). `core.urls` non inclus :
-    # pages de connexion propres à ce projet (comptes.views).
+
     "core.apps.CoreConfig",
     "comptes",
     "referentiel",
