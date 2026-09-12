@@ -34,6 +34,7 @@ from webauthn.helpers.structs import (
     UserVerificationRequirement,
 )
 
+from core import security
 from core.decorators import org_role_requise
 from core.services.acces import traite_gestion_acces
 from core.services.authentification import (
@@ -51,6 +52,11 @@ Agent = get_user_model()
 CLE_DEFI_ENROLEMENT = "webauthn_defi_enrolement"
 CLE_DEFI_CONNEXION = "webauthn_defi_connexion"
 CLE_UTILISATEUR_CONNEXION = "webauthn_utilisateur_connexion"
+
+# Plafond des demandes de défi WebAuthn (par IP + matricule saisi).
+ESPACE_WEBAUTHN = "webauthn-connexion"
+MAX_TENTATIVES_WEBAUTHN = 15
+FENETRE_WEBAUTHN_SECONDES = 5 * 60
 
 
 def _b64(donnees: bytes) -> str:
@@ -195,6 +201,20 @@ def webauthn_connexion_debut(request):
     matricule = json.loads(request.body or "{}").get("matricule", "").strip()
     agent = None
     allow_credentials = []
+
+    # Point d'entrée non authentifié : sans plafond, c'est une génération de
+    # défis gratuite et illimitée (charge serveur, écritures de session). La
+    # cryptographie protège la connexion elle-même, pas la ressource.
+    if security.trop_de_tentatives(
+        request, matricule, ESPACE_WEBAUTHN, MAX_TENTATIVES_WEBAUTHN
+    ):
+        return JsonResponse(
+            {"erreur": "Trop de tentatives. Réessayez dans quelques minutes."},
+            status=429,
+        )
+    security.enregistre_tentative(
+        request, matricule, ESPACE_WEBAUTHN, FENETRE_WEBAUTHN_SECONDES
+    )
 
     if matricule:
         agent = Agent.objects.filter(matricule__iexact=matricule, is_active=True).first()

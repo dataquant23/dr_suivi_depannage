@@ -22,6 +22,7 @@ from django.contrib.auth import get_user_model, login, update_session_auth_hash
 from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
@@ -33,6 +34,9 @@ logger = logging.getLogger("dran.security")
 Agent = get_user_model()
 
 ESPACE_ACTIVATION = "activation-compte"
+ESPACE_REINITIALISATION = "reinit-mot-de-passe"
+MAX_DEMANDES_REINITIALISATION = 5
+FENETRE_REINITIALISATION_SECONDES = 60 * 60
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +98,27 @@ def traite_connexion(
 
         if formulaire.is_valid():
             agent = formulaire.agent
+
+            # Un courriel d'invitation egare ne doit pas rester une porte
+            # ouverte indefiniment : passe le delai, le provisoire ne vaut
+            # plus rien et l'agent repasse par « mot de passe oublie ».
+            # Pas de comptage anti brute-force ici : les identifiants etaient
+            # bons, l'agent est legitime et seulement en retard. Le bloquer
+            # 5 minutes en plus n'apporte rien a un attaquant qui, de toute
+            # facon, n'obtient aucune session.
+            if agent.mot_de_passe_provisoire_expire:
+                logger.info(
+                    "Mot de passe provisoire expiré pour %s depuis %s",
+                    agent.matricule,
+                    security.adresse_client(request),
+                )
+                messages.error(
+                    request,
+                    "Votre mot de passe provisoire a expiré. Utilisez "
+                    "« Mot de passe oublié ? » pour en recevoir un nouveau.",
+                )
+                return render(request, template_name, {"form": formulaire}, status=403)
+
             security.reinitialise(request, matricule_saisi)
             login(request, agent)
             # Nouvelle session : neutralise une éventuelle fixation de session.
@@ -149,6 +174,25 @@ def traite_mot_de_passe_oublie(request, template_name: str, reset_url_name: str,
     """
     formulaire = MotDePasseOublieForm(data=request.POST or None)
     if request.method == "POST" and formulaire.is_valid():
+        email_saisi = (formulaire.cleaned_data.get("email") or "").strip().lower()
+
+        # Sans plafond, le formulaire est un robinet a courriels : harcelement
+        # d'un agent et epuisement du quota SMTP. Le message reste neutre, il
+        # ne dit pas si l'adresse existe.
+        if security.trop_de_tentatives(
+            request, email_saisi, ESPACE_REINITIALISATION, MAX_DEMANDES_REINITIALISATION
+        ):
+            logger.warning(
+                "Demandes de réinitialisation trop fréquentes pour %r depuis %s",
+                email_saisi,
+                security.adresse_client(request),
+            )
+            messages.info(request, "Si un compte correspond à cet email, un lien vient d'être envoyé.")
+            return redirect(login_url_name)
+        security.enregistre_tentative(
+            request, email_saisi, ESPACE_REINITIALISATION, FENETRE_REINITIALISATION_SECONDES
+        )
+
         agent = formulaire.agent_correspondant()
         if agent and agent.email:
             uid = urlsafe_base64_encode(force_bytes(agent.pk))
@@ -214,7 +258,10 @@ def traite_nouvel_utilisateur(request, template_name: str, login_url_name: str):
             mot_de_passe = secrets.token_urlsafe(9)
             agent.set_password(mot_de_passe)
             agent.must_change_password = True
-            agent.save(update_fields=["password", "must_change_password"])
+            agent.mot_de_passe_defini_le = timezone.now()
+            agent.save(
+                update_fields=["password", "must_change_password", "mot_de_passe_defini_le"]
+            )
             try:
                 envoie_identifiants_activation(agent.email, agent.matricule, mot_de_passe)
                 logger.info("Activation envoyée pour %s", agent.matricule)

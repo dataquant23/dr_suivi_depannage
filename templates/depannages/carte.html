@@ -8,6 +8,11 @@
 {% block body_class %}page-carte{% endblock %}
 
 {% block entete_extra %}
+  <!-- SECURE_REFERRER_POLICY="same-origin" (settings.py) bloque tout Referer
+       vers un domaine externe : MapTiler en a besoin pour verifier la
+       restriction de domaine sur la cle. On assouplit uniquement ici,
+       en n'envoyant que l'origine (pas le chemin) aux domaines externes. -->
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">

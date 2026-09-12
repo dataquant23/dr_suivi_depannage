@@ -79,10 +79,17 @@ def _envoyer(sujet, gabarit, contexte, destinataire):
 def initialiser_mot_de_passe(agent):
     """Attribue un mot de passe provisoire et le retourne en clair (pour
     envoi immédiat par courriel — ne pas journaliser ni stocker)."""
+    from django.utils import timezone
+
     mot_de_passe = generer_mot_de_passe_provisoire()
     agent.set_password(mot_de_passe)
     agent.must_change_password = True
-    agent.save(update_fields=["password", "must_change_password"])
+    # Depart du compte a rebours : passe ce delai, le provisoire ne permet
+    # plus de se connecter (cf. `Agent.mot_de_passe_provisoire_expire`).
+    agent.mot_de_passe_defini_le = timezone.now()
+    agent.save(
+        update_fields=["password", "must_change_password", "mot_de_passe_defini_le"]
+    )
     return mot_de_passe
 
 

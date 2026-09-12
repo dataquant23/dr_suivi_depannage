@@ -75,16 +75,20 @@ class ConversionHashTests(SimpleTestCase):
         self.assertTrue(str(resume["empreinte"]).endswith("…"))
 
 
-class MigrationVersPbkdf2Tests(TestCase):
+class MigrationDepuisHashHeriteTests(TestCase):
     def test_le_hash_herite_est_remplace_a_la_premiere_connexion(self):
+        from django.contrib.auth.hashers import get_hasher
+
         agent = cree_agent("AG800")
         agent.password = convertit_hash_werkzeug(hash_werkzeug_scrypt(MOT_DE_PASSE))[0]
         agent.save(update_fields=["password"])
 
         self.assertTrue(agent.check_password(MOT_DE_PASSE))
         agent.refresh_from_db()
+        # Le hacheur cible est celui configuré en tête de PASSWORD_HASHERS,
+        # pas un algorithme figé dans le test.
         self.assertTrue(
-            agent.password.startswith("pbkdf2_sha256$"),
+            agent.password.startswith(f"{get_hasher().algorithm}$"),
             "le mot de passe hérité doit être ré-encodé automatiquement",
         )
         self.assertTrue(agent.check_password(MOT_DE_PASSE))

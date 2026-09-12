@@ -123,6 +123,54 @@ def verifie_authentification_unique(app_configs, **kwargs):
     return problemes
 
 
+@register(Tags.security, deploy=True)
+def verifie_valeurs_par_defaut_dangereuses(app_configs, **kwargs):
+    """
+    Refuse un déploiement qui tourne encore sur les valeurs de repli du code.
+
+    `SECRET_KEY` et `DEBUG` ont un défaut pratique en développement, mais qui
+    s'applique **silencieusement** si le `.env` de production est incomplet ou
+    n'est pas lu (mauvais répertoire de travail, variable mal orthographiée).
+    Le symptôme est invisible ; la conséquence ne l'est pas : pages d'erreur
+    détaillées en ligne, et sessions/jetons de réinitialisation forgeables avec
+    une clé publiée dans le dépôt.
+    """
+    problemes = []
+
+    cle = str(getattr(settings, "SECRET_KEY", ""))
+    if cle.startswith(("dev-secret", "django-insecure-")) or len(cle) < 32:
+        problemes.append(
+            Error(
+                "SECRET_KEY de développement (ou trop courte) utilisée en déploiement.",
+                hint=(
+                    "Générez-en une propre : python manage.py generer_secret_key, "
+                    "puis vérifiez que le .env est bien lu par le processus."
+                ),
+                id=f"{IDENTIFIANT}.E010",
+            )
+        )
+
+    if settings.DEBUG:
+        problemes.append(
+            Error(
+                "DEBUG est actif alors que le contrôle de déploiement est lancé.",
+                hint="Renseignez DEBUG=False dans le .env du serveur.",
+                id=f"{IDENTIFIANT}.E011",
+            )
+        )
+
+    if "*" in getattr(settings, "ALLOWED_HOSTS", []):
+        problemes.append(
+            Error(
+                "ALLOWED_HOSTS contient « * » : l'application répond à n'importe quel hôte.",
+                hint="Listez explicitement les domaines servis.",
+                id=f"{IDENTIFIANT}.E012",
+            )
+        )
+
+    return problemes
+
+
 @register(Tags.database)
 def verifie_base_partagee(app_configs, **kwargs):
     """Un projet satellite ne doit pas être propriétaire du socle."""

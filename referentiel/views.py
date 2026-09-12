@@ -29,6 +29,19 @@ def _refuser_si_non_admin(request):
     return None
 
 
+def _agents_administrables(request):
+    """Agents sur lesquels l'utilisateur courant peut agir.
+
+    Meme perimetre que la liste : un administrateur « simple » ne voit pas les
+    superutilisateurs, il ne doit donc pas pouvoir les viser directement par
+    leur identifiant (reinitialisation de mot de passe, changement de
+    perimetre, suspension d'acces).
+    """
+    if request.user.is_superuser:
+        return Agent.objects.all()
+    return Agent.objects.filter(is_superuser=False)
+
+
 @login_required
 def administration(request):
     redirection = _refuser_si_non_responsable(request)
@@ -218,7 +231,7 @@ def modifier_utilisateur(request, pk):
     if redirection:
         return redirection
 
-    agent = get_object_or_404(Agent, pk=pk)
+    agent = get_object_or_404(_agents_administrables(request), pk=pk)
     affectation = getattr(agent, "affectation_depannage", None) or AffectationAgent(agent=agent)
 
     if request.method == "POST":
@@ -251,7 +264,7 @@ def renvoyer_acces(request, pk):
     if redirection:
         return redirection
 
-    agent = get_object_or_404(Agent, pk=pk)
+    agent = get_object_or_404(_agents_administrables(request), pk=pk)
     if not agent.email:
         messages.error(
             request,
@@ -285,7 +298,7 @@ def basculer_utilisateur(request, pk):
     from core.models import AccesApplication
     from core.services.acces import definir_acces
 
-    agent = get_object_or_404(Agent, pk=pk)
+    agent = get_object_or_404(_agents_administrables(request), pk=pk)
     if agent == request.user:
         messages.error(request, "Impossible de suspendre votre propre accès.")
         return redirect("referentiel:utilisateurs")

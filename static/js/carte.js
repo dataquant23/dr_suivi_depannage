@@ -74,6 +74,16 @@
     return "#8fc7a2";
   }
 
+  // Declaration (et non const flechee) : remontee en haut de portee, donc
+  // utilisable par les fonctions definies plus haut dans le fichier.
+  function echapper(valeur) {
+    return String(valeur ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
   const resumeZone = document.getElementById("resume-zone-carte");
   document.getElementById("fermer-resume-zone")?.addEventListener("click", () => {
     resumeZone.classList.remove("visible");
@@ -98,9 +108,9 @@
       '<button type="button" class="fermer-resume-zone" aria-label="Fermer le résumé">' +
       '<span class="btn-symbol i-fermer" aria-hidden="true"></span></button>' +
       '<span class="etiquette">' + libelleNiveau(niveau) + '</span>' +
-      "<strong>" + p.nom + "</strong>" +
+      "<strong>" + echapper(p.nom) + "</strong>" +
       (niveau === "quartier"
-        ? "<p>" + (p.commune || "Commune non renseignée") + "</p>"
+        ? "<p>" + echapper(p.commune || "Commune non renseignée") + "</p>"
         : "") +
       '<div class="mini-stats-zone">' +
       "<span><b>" + p.total + "</b> dossiers</span>" +
@@ -187,13 +197,6 @@
   const popoverCoord = document.getElementById("popover-coord");
   const popoverRayon = document.getElementById("popover-rayon");
   const resumePerimetre = document.getElementById("resume-perimetre");
-
-  const echapper = (valeur) =>
-    String(valeur ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
 
   function fermerPopovers(sauf) {
     [popoverCoord, popoverRayon].forEach((p) => {

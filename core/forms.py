@@ -75,10 +75,15 @@ class DefinirMotDePasseForm(forms.Form):
         return donnees
 
     def save(self, agent=None):
+        from django.utils import timezone
+
         agent = agent or self.agent
         agent.set_password(self.cleaned_data["password1"])
         agent.must_change_password = False
-        agent.save(update_fields=["password", "must_change_password"])
+        agent.mot_de_passe_defini_le = timezone.now()
+        agent.save(
+            update_fields=["password", "must_change_password", "mot_de_passe_defini_le"]
+        )
         return agent
 
 

@@ -5,6 +5,8 @@ from xml.sax.saxutils import escape
 
 from django.http import HttpResponse
 from django.utils import timezone
+
+from core.validators import neutralise_formule
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -459,6 +461,17 @@ def _styliser_feuille_dossiers(feuille, largeurs, ligne_entete=1):
     feuille.page_setup.fitToHeight = 0
 
 
+def _cellule_sure(valeur):
+    """Neutralise une formule Excel sans abimer les « - » de remplissage.
+
+    Un caractere seul (« - ») ne peut pas former de formule : on ne prefixe
+    que les chaines qui pourraient reellement en etre une.
+    """
+    if isinstance(valeur, str) and len(valeur) > 1:
+        return neutralise_formule(valeur)
+    return valeur
+
+
 def _lignes(depannages):
     for depannage in depannages:
         duree = depannage.heures_ecoulees
@@ -470,21 +483,27 @@ def _lignes(depannages):
         clotureurs = ", ".join(
             str(c.cloture_par) for c in depannage.clotures.all()
         )
+        # neutralise_formule : un numero de BT saisi « =HYPERLINK(...) » ou
+        # « =cmd|... » s executerait comme formule a l ouverture du classeur
+        # par le responsable (injection de formule).
         yield [
-            depannage.numero_bt,
-            depannage.date_saisie.strftime("%d/%m/%Y %H:%M"),
-            depannage.get_categorie_provisoire_display() or "-",
-            depannage.get_statut_display(),
-            depannage.secteur.libelle if depannage.secteur_id else "-",
-            depannage.commune.nom if depannage.commune_id else "-",
-            depannage.quartier.nom if depannage.quartier_id else "-",
-            ", ".join(
-                f"{e.structure.code}/{e.libelle}" for e in depannage.equipements.all()
-            ),
-            _valeur_delai_jh(duree),
-            "Oui" if hors_delai else "Non",
-            str(depannage.cree_par),
-            clotureurs or "-",
+            _cellule_sure(valeur)
+            for valeur in (
+                depannage.numero_bt,
+                depannage.date_saisie.strftime("%d/%m/%Y %H:%M"),
+                depannage.get_categorie_provisoire_display() or "-",
+                depannage.get_statut_display(),
+                depannage.secteur.libelle if depannage.secteur_id else "-",
+                depannage.commune.nom if depannage.commune_id else "-",
+                depannage.quartier.nom if depannage.quartier_id else "-",
+                ", ".join(
+                    f"{e.structure.code}/{e.libelle}" for e in depannage.equipements.all()
+                ),
+                _valeur_delai_jh(duree),
+                "Oui" if hors_delai else "Non",
+                str(depannage.cree_par),
+                clotureurs or "-",
+            )
         ]
 
 

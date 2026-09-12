@@ -1,6 +1,8 @@
 """Modèles partagés par les deux applications métier."""
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.validators import RegexValidator
@@ -249,6 +251,12 @@ class Agent(AbstractBaseUser, PermissionsMixin):
     )
 
     must_change_password = models.BooleanField("doit changer son mot de passe", default=True)
+    # Date d'attribution du mot de passe provisoire : sert uniquement à le
+    # faire expirer (cf. `mot_de_passe_provisoire_expire`). Vide pour les
+    # comptes antérieurs à ce champ — ils ne sont donc jamais bloqués.
+    mot_de_passe_defini_le = models.DateTimeField(
+        "mot de passe attribué le", null=True, blank=True
+    )
     is_active = models.BooleanField("actif", default=True)
     is_staff = models.BooleanField("accès à l'administration", default=False)
     date_joined = models.DateTimeField(default=timezone.now)
@@ -284,6 +292,26 @@ class Agent(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self) -> str:
         return self.premier_prenom or self.matricule
+
+    # -- Mot de passe provisoire ------------------------------------------
+    @property
+    def mot_de_passe_provisoire_expire(self) -> bool:
+        """Le provisoire envoyé par courriel a-t-il dépassé sa durée de vie ?
+
+        Un courriel d'invitation égaré resterait sinon exploitable
+        indéfiniment. Ne concerne que les comptes qui n'ont pas encore choisi
+        leur mot de passe (`must_change_password`) : dès qu'il est renouvelé,
+        la contrainte disparaît.
+
+        Sans horodatage (comptes créés avant l'ajout du champ), on ne bloque
+        pas : on ne peut pas savoir si le provisoire date d'hier ou d'un an.
+        """
+        if not self.must_change_password or self.mot_de_passe_defini_le is None:
+            return False
+        jours = getattr(settings, "MOT_DE_PASSE_PROVISOIRE_JOURS", 0)
+        if not jours:
+            return False
+        return timezone.now() - self.mot_de_passe_defini_le > timedelta(days=jours)
 
     # -- Profils et droits ------------------------------------------------
     @property

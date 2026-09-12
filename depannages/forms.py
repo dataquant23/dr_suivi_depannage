@@ -21,8 +21,15 @@ class SaisieFichiersMultiples(forms.ClearableFileInput):
     allow_multiple_selected = True
 
 
-class ChampFichiersMultiples(forms.FileField):
-    """Accepte plusieurs images pour un meme champ et renvoie une liste."""
+class ChampFichiersMultiples(forms.ImageField):
+    """Accepte plusieurs images pour un meme champ et renvoie une liste.
+
+    ImageField (et non FileField) : le contenu est verifie par Pillow, sinon
+    n importe quel fichier (.html, .svg, .js) passerait sous un nom d image et
+    serait ensuite servi depuis MEDIA_URL, sur la meme origine que
+    l application. `PhotoDepannage.objects.create()` n appelle pas
+    `full_clean()` : la validation du modele ne rattraperait pas le coup.
+    """
 
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("widget", SaisieFichiersMultiples())

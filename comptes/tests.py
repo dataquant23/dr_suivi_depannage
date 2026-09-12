@@ -104,7 +104,11 @@ class TestsInitialisation(BaseComptes):
         mot_de_passe = initialiser_mot_de_passe(agent)
         agent.refresh_from_db()
         self.assertNotIn(mot_de_passe, agent.password)
-        self.assertTrue(agent.password.startswith("pbkdf2_"))
+        # Compare au hacheur configuré plutôt qu'à un nom en dur : le test
+        # reste valable si PASSWORD_HASHERS change (PBKDF2 -> Argon2...).
+        from django.contrib.auth.hashers import get_hasher
+
+        self.assertTrue(agent.password.startswith(f"{get_hasher().algorithm}$"))
 
     def test_invitation_envoyee_avec_identifiant_et_mot_de_passe(self):
         agent = self.creer_agent(matricule="kouame")

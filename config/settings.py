@@ -120,10 +120,13 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+# Argon2 en tete : bien plus couteux a casser sur GPU que PBKDF2. Les
+# condensats deja stockes restent lisibles (hacheurs suivants) et sont
+# re-encodes en Argon2 a la connexion suivante de chaque agent.
 PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
-    "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
     "django.contrib.auth.hashers.ScryptPasswordHasher",
     "core.hashers.WerkzeugScryptPasswordHasher",
@@ -140,6 +143,11 @@ DR_URL_CONNEXION = env("DR_URL_CONNEXION", default="")
 # Anti brute-force (core.security).
 DR_LOGIN_MAX_ATTEMPTS = env.int("DR_LOGIN_MAX_ATTEMPTS", default=5)
 DR_LOGIN_LOCKOUT_SECONDS = env.int("DR_LOGIN_LOCKOUT_SECONDS", default=5 * 60)
+
+# Plafond des demandes d'activation de compte par adresse (core.services.
+# authentification.traite_nouvel_utilisateur).
+DR_ACTIVATION_MAX_TENTATIVES = env.int("DR_ACTIVATION_MAX_TENTATIVES", default=5)
+DR_ACTIVATION_FENETRE_SECONDES = env.int("DR_ACTIVATION_FENETRE_SECONDES", default=60 * 60)
 
 # Direction régionale par défaut, exigée par le socle pour amorcer
 # core.DirectionRegionale sur une base fraîche.
@@ -217,7 +225,10 @@ EMAIL_BACKEND = env(
 # URL de base pour les liens des courriels hors requête HTTP.
 SITE_URL = env("SITE_URL", default="http://localhost:8000")
 
-MOT_DE_PASSE_PROVISOIRE_JOURS = env.int("MOT_DE_PASSE_PROVISOIRE_JOURS", default=7)
+# Duree de vie du mot de passe provisoire envoye par courriel. Passe ce
+# delai, il ne permet plus de se connecter : l'agent repasse par « mot de
+# passe oublie ». Mettre 0 desactive l'expiration.
+MOT_DE_PASSE_PROVISOIRE_JOURS = env.int("MOT_DE_PASSE_PROVISOIRE_JOURS", default=2)
 PASSWORD_RESET_TIMEOUT = env.int("PASSWORD_RESET_TIMEOUT", default=2 * 60 * 60)
 
 # --- Securite (activee automatiquement hors DEBUG) --------------------------
