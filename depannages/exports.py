@@ -1,5 +1,6 @@
 """Exports Excel et PDF du récapitulatif de dépannages."""
 
+from functools import partial
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -7,10 +8,13 @@ from django.http import HttpResponse
 from django.utils import timezone
 
 from core.validators import neutralise_formule
+
+from .models import Statut
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table as ExcelTable, TableStyleInfo
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -32,6 +36,7 @@ from reportlab.platypus.frames import Frame
 
 RACINE_PROJET = Path(__file__).resolve().parent.parent
 LOGO_CIE = RACINE_PROJET / "static" / "img" / "Logo_CIE.jpg"
+ILLUSTRATION_COUVERTURE = RACINE_PROJET / "static" / "img" / "pylones.png"
 
 NAVY = "0F6F3F"
 VERT_FONCE = "064128"
@@ -56,11 +61,8 @@ FOND_ROUGE = "FDECEC"
 FOND_VIOLET = "F1EDFD"
 FOND_JAUNE = "FFF7DA"
 
-COULEURS_KPI = [BLEU, VERT, ORANGE, ORANGE, VIOLET, BLEU, ROUGE, JAUNE]
-FONDS_KPI = [FOND_BLEU, FOND_VERT, FOND_ORANGE, FOND_ORANGE, FOND_VIOLET, FOND_BLEU, FOND_ROUGE, FOND_JAUNE]
-
 ENTETES = [
-    "N BT / BTA",
+    "Nº BTA",
     "Date de saisie",
     "Nature du dossier",
     "Statut",
@@ -100,10 +102,31 @@ def _kpi_code(libelle):
     return "BT"
 
 
+def _kpi_theme(libelle):
+    texte = str(libelle).lower()
+    if "hors" in texte or "retard" in texte:
+        return ROUGE, FOND_ROUGE
+    if "provisoire" in texte or "cloturer" in texte or "clôturer" in texte or "shunt" in texte:
+        return ORANGE, FOND_ORANGE
+    return VERT, FOND_VERT
+
+
 def _logo_pdf(largeur=23 * mm, hauteur=13 * mm):
     if not LOGO_CIE.exists():
         return ""
     return RLImage(str(LOGO_CIE), width=largeur, height=hauteur)
+
+
+def _rect_alpha(canevas, couleur, x, y, largeur, hauteur, alpha=1, rayon=0, stroke=0):
+    canevas.saveState()
+    if hasattr(canevas, "setFillAlpha"):
+        canevas.setFillAlpha(alpha)
+    canevas.setFillColor(_couleur(couleur))
+    if rayon:
+        canevas.roundRect(x, y, largeur, hauteur, rayon, stroke=stroke, fill=1)
+    else:
+        canevas.rect(x, y, largeur, hauteur, stroke=stroke, fill=1)
+    canevas.restoreState()
 
 
 def _ajouter_logo_excel(feuille, cellule="B1"):
@@ -127,68 +150,396 @@ class _GrilleKpiPdf(Flowable):
 
     def wrap(self, largeur_disponible, hauteur_disponible):
         self.largeur = min(self.largeur, largeur_disponible)
-        lignes = (len(self.kpis) + self.colonnes - 1) // self.colonnes
         self.width = self.largeur
-        self.height = lignes * self.hauteur_carte + max(lignes - 1, 0) * self.gouttiere
+        self.height = 48 * mm if len(self.kpis) > 1 else 34 * mm
         return self.width, self.height
 
     def draw(self):
         if not self.kpis:
             return
         canevas = self.canv
-        largeur_carte = (
-            self.width - (self.colonnes - 1) * self.gouttiere
-        ) / self.colonnes
-        valeur_style = ParagraphStyle(
-            "KpiFlowValue",
-            parent=self.styles["Normal"],
-            fontName="Helvetica-Bold",
-            fontSize=18,
-            leading=20,
-            textColor=_couleur(VERT_FONCE),
-        )
-        libelle_style = ParagraphStyle(
-            "KpiFlowLabel",
-            parent=self.styles["Normal"],
-            fontName="Helvetica-Bold",
-            fontSize=7.8,
-            leading=9,
-            textColor=_couleur(SLATE),
-        )
+        principal = self.kpis[0]
+        secondaires = self.kpis[1:]
+        largeur_principale = 78 * mm
+        espace = 6 * mm
+        largeur_secondaire = self.width - largeur_principale - espace
 
-        for index, (libelle, valeur) in enumerate(self.kpis):
-            colonne = index % self.colonnes
-            ligne = index // self.colonnes
-            x = colonne * (largeur_carte + self.gouttiere)
-            y = self.height - (ligne + 1) * self.hauteur_carte - ligne * self.gouttiere
-            accent = COULEURS_KPI[index % len(COULEURS_KPI)]
-            fond = FONDS_KPI[index % len(FONDS_KPI)]
+        canevas.saveState()
+        canevas.setFillColor(_couleur(VERT_FONCE))
+        canevas.setStrokeColor(_couleur(VERT_FONCE))
+        canevas.roundRect(0, 0, largeur_principale, self.height, 6, stroke=0, fill=1)
+        canevas.setFillColor(_couleur(ORANGE))
+        canevas.rect(0, 0, 4 * mm, self.height, stroke=0, fill=1)
+        canevas.setFont("Helvetica-Bold", 8)
+        canevas.setFillColor(_couleur(VERT_DOUX))
+        canevas.drawString(9 * mm, self.height - 12 * mm, "VOLUME À PILOTER")
+        canevas.setFont("Helvetica-Bold", 30)
+        canevas.setFillColor(colors.white)
+        canevas.drawString(9 * mm, self.height - 30 * mm, str(principal[1]))
+        canevas.setFont("Helvetica-Bold", 10)
+        canevas.drawString(9 * mm, self.height - 39 * mm, str(principal[0])[:30])
+        canevas.setFont("Helvetica", 7)
+        canevas.setFillColor(_couleur(VERT_DOUX))
+        canevas.drawString(9 * mm, 9 * mm, "Synthèse opérationnelle CIE")
+        canevas.restoreState()
 
+        if not secondaires:
+            return
+
+        colonnes = 3 if len(secondaires) > 3 else len(secondaires)
+        lignes = (len(secondaires) + colonnes - 1) // colonnes
+        largeur_carte = (largeur_secondaire - (colonnes - 1) * 4 * mm) / colonnes
+        hauteur_carte = (self.height - (lignes - 1) * 4 * mm) / lignes
+        for index, (libelle, valeur) in enumerate(secondaires):
+            colonne = index % colonnes
+            ligne = index // colonnes
+            x = largeur_principale + espace + colonne * (largeur_carte + 4 * mm)
+            y = self.height - (ligne + 1) * hauteur_carte - ligne * 4 * mm
+            accent, fond = _kpi_theme(libelle)
             canevas.saveState()
             canevas.setFillColor(colors.white)
             canevas.setStrokeColor(_couleur(BORDURE))
-            canevas.setLineWidth(0.6)
-            canevas.roundRect(x, y, largeur_carte, self.hauteur_carte, 7, stroke=1, fill=1)
-            canevas.setFillColor(_couleur(accent))
-            canevas.roundRect(x, y, 3.4 * mm, self.hauteur_carte, 7, stroke=0, fill=1)
+            canevas.setLineWidth(0.55)
+            canevas.roundRect(x, y, largeur_carte, hauteur_carte, 5, stroke=1, fill=1)
             canevas.setFillColor(_couleur(fond))
-            canevas.circle(x + 12 * mm, y + self.hauteur_carte - 10.5 * mm, 6.2 * mm, stroke=0, fill=1)
+            canevas.rect(x, y, largeur_carte, 4 * mm, stroke=0, fill=1)
             canevas.setFillColor(_couleur(accent))
-            canevas.setFont("Helvetica-Bold", 6.8)
-            canevas.drawCentredString(
-                x + 12 * mm,
-                y + self.hauteur_carte - 12 * mm,
-                _kpi_code(libelle),
-            )
+            canevas.setFont("Helvetica-Bold", 7)
+            canevas.drawString(x + 5 * mm, y + hauteur_carte - 8 * mm, _kpi_code(libelle))
+            canevas.setFont("Helvetica-Bold", 18)
+            canevas.setFillColor(_couleur(VERT_FONCE))
+            canevas.drawRightString(x + largeur_carte - 5 * mm, y + hauteur_carte - 9 * mm, str(valeur))
+            canevas.setFont("Helvetica-Bold", 7.5)
+            canevas.setFillColor(_couleur(SLATE))
+            canevas.drawString(x + 5 * mm, y + 8 * mm, str(libelle)[:28])
             canevas.restoreState()
 
-            largeur_texte = largeur_carte - 24 * mm
-            valeur_para = Paragraph(_paragraphe(valeur), valeur_style)
-            libelle_para = Paragraph(_paragraphe(libelle), libelle_style)
-            valeur_para.wrapOn(canevas, largeur_texte, 10 * mm)
-            libelle_para.wrapOn(canevas, largeur_texte, 11 * mm)
-            valeur_para.drawOn(canevas, x + 23 * mm, y + 13 * mm)
-            libelle_para.drawOn(canevas, x + 23 * mm, y + 5 * mm)
+
+class _BarresHorizontalesPdf(Flowable):
+    def __init__(self, titre, donnees, styles, largeur=126 * mm, limite=8):
+        super().__init__()
+        self.titre = titre
+        self.donnees = [(str(libelle), valeur or 0) for libelle, valeur in donnees[:limite]]
+        self.styles = styles
+        self.largeur = largeur
+        self.hauteur_titre = 12 * mm
+        self.hauteur_ligne = 9 * mm
+        self.marge_interne = 6 * mm
+
+    def wrap(self, largeur_disponible, hauteur_disponible):
+        self.width = min(self.largeur, largeur_disponible)
+        self.height = self.hauteur_titre + max(len(self.donnees), 1) * self.hauteur_ligne + 8 * mm
+        return self.width, self.height
+
+    def draw(self):
+        canevas = self.canv
+        canevas.saveState()
+        canevas.setFillColor(colors.white)
+        canevas.setStrokeColor(_couleur(BORDURE))
+        canevas.setLineWidth(0.5)
+        canevas.roundRect(0, 0, self.width, self.height, 5, stroke=1, fill=1)
+        _rect_alpha(canevas, VERT_DOUX, 0, self.height - self.hauteur_titre, self.width, self.hauteur_titre, 0.92)
+        canevas.setFillColor(_couleur(ORANGE))
+        canevas.rect(0, self.height - self.hauteur_titre, 1.8 * mm, self.hauteur_titre, stroke=0, fill=1)
+        canevas.setFillColor(_couleur(VERT_FONCE))
+        canevas.setFont("Helvetica-Bold", 8.2)
+        canevas.drawString(5 * mm, self.height - 8 * mm, self.titre[:46])
+
+        if not self.donnees:
+            canevas.setFont("Helvetica", 8)
+            canevas.setFillColor(_couleur(SLATE))
+            canevas.drawString(5 * mm, self.height - self.hauteur_titre - 8 * mm, "Aucune donnée")
+            canevas.restoreState()
+            return
+
+        maximum = max([valeur for _, valeur in self.donnees] + [1])
+        label_width = self.width * 0.42
+        value_width = 13 * mm
+        bar_x = label_width + self.marge_interne
+        bar_width = self.width - bar_x - value_width - self.marge_interne
+        y = self.height - self.hauteur_titre - 8 * mm
+
+        for index, (libelle, valeur) in enumerate(self.donnees):
+            ligne_y = y - index * self.hauteur_ligne
+            canevas.setFont("Helvetica", 6.8)
+            canevas.setFillColor(_couleur(SLATE_DARK))
+            canevas.drawString(5 * mm, ligne_y, libelle[:32])
+            canevas.setFillColor(_couleur(FOND_CLAIR))
+            canevas.roundRect(bar_x, ligne_y - 1.2 * mm, bar_width, 2.8 * mm, 1.4 * mm, stroke=0, fill=1)
+            canevas.setFillColor(_couleur(VERT_FONCE))
+            largeur_valeur = bar_width * (valeur / maximum)
+            canevas.roundRect(
+                bar_x,
+                ligne_y - 1.2 * mm,
+                max(largeur_valeur, 0.8 * mm),
+                2.8 * mm,
+                1.4 * mm,
+                stroke=0,
+                fill=1,
+            )
+            canevas.setFont("Helvetica-Bold", 6.8)
+            canevas.setFillColor(_couleur(VERT_FONCE))
+            canevas.drawRightString(self.width - 5 * mm, ligne_y, str(valeur))
+        canevas.restoreState()
+
+
+def _bloc_graphique_pdf(titre, donnees, styles, largeur=126 * mm, limite=8):
+    return _BarresHorizontalesPdf(titre, donnees, styles, largeur=largeur, limite=limite)
+
+
+def _periode_courte_pdf(debut, fin):
+    mois = [
+        "",
+        "JANVIER",
+        "FEVRIER",
+        "MARS",
+        "AVRIL",
+        "MAI",
+        "JUIN",
+        "JUILLET",
+        "AOUT",
+        "SEPTEMBRE",
+        "OCTOBRE",
+        "NOVEMBRE",
+        "DECEMBRE",
+    ]
+    return f"{debut:%d} -> {fin:%d} {mois[fin.month]} {fin:%Y}"
+
+
+def _tableau_top_pdf(titre, colonnes, donnees, largeurs):
+    corps = [[Paragraph(titre, ParagraphStyle(
+        "TopTitre",
+        parent=getSampleStyleSheet()["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=8,
+        leading=9,
+        textColor=_couleur(VERT_FONCE),
+    ))]]
+    tableau_titre = Table(corps, colWidths=[sum(largeurs)])
+    tableau_titre.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), _couleur(VERT_DOUX)),
+        ("BOX", (0, 0), (-1, -1), 0.4, _couleur(BORDURE)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    lignes = [colonnes] + donnees
+    tableau = Table(lignes, colWidths=largeurs, repeatRows=1)
+    tableau.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), _couleur(FOND_CLAIR)),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("TEXTCOLOR", (0, 0), (-1, 0), _couleur(SLATE_DARK)),
+        ("FONTSIZE", (0, 0), (-1, -1), 6.5),
+        ("GRID", (0, 0), (-1, -1), 0.25, _couleur(BORDURE)),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _couleur(FOND_CLAIR)]),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    return [tableau_titre, tableau]
+
+
+def _carte_indicateurs_pdf(resume, largeur=58 * mm):
+    lignes = [
+        ["Autres indicateurs", ""],
+        ["Interventions", _texte_kpi(resume, "depannage") or _texte_kpi(resume, "dossier") or "-"],
+        ["Délai moyen", _texte_kpi(resume, "delai") or "-"],
+        ["Clôtures hors délai", _texte_kpi(resume, "hors") or "-"],
+    ]
+    tableau = Table(lignes, colWidths=[35 * mm, largeur - 35 * mm])
+    tableau.setStyle(TableStyle([
+        ("SPAN", (0, 0), (-1, 0)),
+        ("BACKGROUND", (0, 0), (-1, 0), _couleur(VERT_DOUX)),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("TEXTCOLOR", (0, 0), (-1, 0), _couleur(VERT_FONCE)),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+        ("BOX", (0, 0), (-1, -1), 0.4, _couleur(BORDURE)),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.25, _couleur(BORDURE)),
+        ("FONTNAME", (1, 1), (1, -1), "Helvetica-Bold"),
+        ("TEXTCOLOR", (1, 1), (1, -2), _couleur(VERT)),
+        ("TEXTCOLOR", (1, -1), (1, -1), _couleur(ROUGE)),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("FONTSIZE", (1, 1), (1, -1), 12),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return tableau
+
+
+class _EnteteOperationnellePdf(Flowable):
+    def __init__(self, titre, sous_titre, debut, fin, genere_le, largeur=182 * mm):
+        super().__init__()
+        self.titre = titre
+        self.sous_titre = sous_titre
+        self.debut = debut
+        self.fin = fin
+        self.genere_le = genere_le
+        self.largeur = largeur
+        self.height = 28 * mm
+
+    def wrap(self, largeur_disponible, hauteur_disponible):
+        self.width = min(self.largeur, largeur_disponible)
+        return self.width, self.height
+
+    def draw(self):
+        canevas = self.canv
+        canevas.saveState()
+        canevas.setFillColor(_couleur(VERT_FONCE))
+        canevas.setFont("Helvetica-Bold", 19)
+        canevas.drawString(0, 15 * mm, self.titre)
+        canevas.setFillColor(_couleur(ORANGE))
+        canevas.rect(0, 9.3 * mm, 13 * mm, 0.8 * mm, stroke=0, fill=1)
+        canevas.setFillColor(_couleur(SLATE_DARK))
+        canevas.setFont("Helvetica", 10)
+        canevas.drawString(0, 4.8 * mm, self.sous_titre)
+        canevas.restoreState()
+
+
+class _CartesImpactPdf(Flowable):
+    def __init__(self, resume, largeur=182 * mm):
+        super().__init__()
+        self.kpis = _aplatir_resume(resume)
+        self.largeur = largeur
+        self.height = 53 * mm
+
+    def wrap(self, largeur_disponible, hauteur_disponible):
+        self.width = min(self.largeur, largeur_disponible)
+        return self.width, self.height
+
+    def draw(self):
+        if not self.kpis:
+            return
+        canevas = self.canv
+        colonnes = 4
+        gouttiere = 4 * mm
+        largeur_carte = (self.width - (colonnes - 1) * gouttiere) / colonnes
+        hauteur_carte = 22 * mm
+        for index, (libelle, valeur) in enumerate(self.kpis[:8]):
+            colonne = index % colonnes
+            ligne = index // colonnes
+            x = colonne * (largeur_carte + gouttiere)
+            y = self.height - (ligne + 1) * hauteur_carte - ligne * 5 * mm
+            accent, fond = _kpi_theme(libelle)
+            canevas.saveState()
+            canevas.setFillColor(colors.white)
+            canevas.setStrokeColor(_couleur(BORDURE))
+            canevas.setLineWidth(0.45)
+            canevas.roundRect(x, y, largeur_carte, hauteur_carte, 5, stroke=1, fill=1)
+            canevas.setFillColor(_couleur(accent))
+            canevas.roundRect(x, y, 2.1 * mm, hauteur_carte, 2, stroke=0, fill=1)
+            _rect_alpha(canevas, fond, x + 2.1 * mm, y, largeur_carte - 2.1 * mm, hauteur_carte, 0.72, rayon=5)
+            canevas.setFillColor(colors.white)
+            canevas.circle(x + largeur_carte - 10 * mm, y + hauteur_carte - 9 * mm, 6 * mm, stroke=0, fill=1)
+            canevas.setFillColor(_couleur(accent))
+            canevas.setFont("Helvetica-Bold", 8)
+            canevas.drawCentredString(x + largeur_carte - 10 * mm, y + hauteur_carte - 11 * mm, _kpi_code(libelle))
+            canevas.setFont("Helvetica-Bold", 22)
+            canevas.drawString(x + 6 * mm, y + 9.5 * mm, str(valeur))
+            canevas.setFont("Helvetica-Bold", 7.1)
+            canevas.drawString(x + 6 * mm, y + 5 * mm, str(libelle).upper()[:23])
+            canevas.setFillColor(_couleur(accent))
+            canevas.rect(x + 6 * mm, y + 2.5 * mm, 10 * mm, 0.55 * mm, stroke=0, fill=1)
+            canevas.restoreState()
+
+
+class _DonutTraitementPdf(Flowable):
+    def __init__(self, resume, largeur=58 * mm):
+        super().__init__()
+        self.resume = resume
+        self.largeur = largeur
+        self.height = 78 * mm
+
+    def wrap(self, largeur_disponible, hauteur_disponible):
+        self.width = min(self.largeur, largeur_disponible)
+        return self.width, self.height
+
+    def draw(self):
+        a_cloturer = _entier_kpi(self.resume, "cloturer")
+        clotures = _entier_kpi(self.resume, "clotures") or _entier_kpi(self.resume, "traites")
+        hors_delai = _entier_kpi(self.resume, "hors")
+        total = max(a_cloturer + clotures + hors_delai, 1)
+        valeurs = [
+            ("À clôturer", a_cloturer, ORANGE),
+            ("Clôtures", clotures, VERT),
+            ("Hors délai", hors_delai, ROUGE),
+        ]
+        canevas = self.canv
+        canevas.saveState()
+        canevas.setFillColor(colors.white)
+        canevas.setStrokeColor(_couleur(BORDURE))
+        canevas.setLineWidth(0.5)
+        canevas.roundRect(0, 0, self.width, self.height, 5, stroke=1, fill=1)
+        _rect_alpha(canevas, VERT_DOUX, 0, self.height - 11 * mm, self.width, 11 * mm, 0.92)
+        canevas.setFillColor(_couleur(ORANGE))
+        canevas.rect(0, self.height - 11 * mm, 1.8 * mm, 11 * mm, stroke=0, fill=1)
+        canevas.setFillColor(_couleur(VERT_FONCE))
+        canevas.setFont("Helvetica-Bold", 8)
+        canevas.drawString(5 * mm, self.height - 7 * mm, "État du traitement")
+
+        taille = 38 * mm if self.width >= 80 * mm else 30 * mm
+        x1 = (self.width - taille) / 2
+        y1 = 27 * mm
+        angle = 90
+        for _, valeur, couleur in valeurs:
+            if not valeur:
+                continue
+            etendue = 360 * valeur / total
+            canevas.setFillColor(_couleur(couleur))
+            # Trait blanc fin entre les segments : lisibilite d'un anneau
+            # plutot que l'effet camembert plein d'un simple wedge.
+            canevas.setStrokeColor(colors.white)
+            canevas.setLineWidth(1.2)
+            canevas.wedge(x1, y1, x1 + taille, y1 + taille, angle, -etendue, stroke=1, fill=1)
+            angle -= etendue
+        canevas.setFillColor(colors.white)
+        canevas.circle(x1 + taille / 2, y1 + taille / 2, taille * 0.39, stroke=0, fill=1)
+        canevas.setFillColor(_couleur(VERT_FONCE))
+        canevas.setFont("Helvetica-Bold", 15 if self.width >= 80 * mm else 12)
+        canevas.drawCentredString(x1 + taille / 2, y1 + taille / 2 + 1.5 * mm, str(total))
+        canevas.setFont("Helvetica", 6.8)
+        canevas.setFillColor(_couleur(SLATE))
+        canevas.drawCentredString(x1 + taille / 2, y1 + taille / 2 - 4 * mm, "dossiers")
+
+        y = 18 * mm
+        x_legende = max(8 * mm, (self.width - 58 * mm) / 2)
+        for libelle, valeur, couleur in valeurs:
+            canevas.setFillColor(_couleur(couleur))
+            canevas.rect(x_legende, y - 1.8 * mm, 3 * mm, 3 * mm, stroke=0, fill=1)
+            canevas.setFillColor(_couleur(SLATE_DARK))
+            canevas.setFont("Helvetica", 7)
+            canevas.drawString(x_legende + 6.5 * mm, y - 1.8 * mm, libelle)
+            canevas.setFont("Helvetica-Bold", 7)
+            canevas.drawRightString(min(self.width - 8 * mm, x_legende + 58 * mm), y - 1.8 * mm, str(valeur))
+            y -= 7 * mm
+        canevas.restoreState()
+
+
+def _texte_kpi(resume, *mots):
+    mots = [mot.lower() for mot in mots]
+    for libelle, valeur in _aplatir_resume(resume):
+        texte = str(libelle).lower()
+        texte = texte.replace("é", "e").replace("è", "e").replace("ê", "e").replace("ô", "o").replace("û", "u").replace("à", "a")
+        if all(mot in texte for mot in mots):
+            return str(valeur)
+    return None
+
+
+def _entier_kpi(resume, *mots):
+    valeur = _texte_kpi(resume, *mots)
+    if valeur is None:
+        return 0
+    chiffres = "".join(car for car in str(valeur) if car.isdigit())
+    return int(chiffres) if chiffres else 0
+
+
+def _trouver_repartition(repartitions, mot_cle):
+    mot_cle = mot_cle.lower()
+    for nom_bloc, donnees in repartitions:
+        if mot_cle in str(nom_bloc).lower():
+            return donnees
+    return []
 
 
 def _entete_rapport_pdf(titre, sous_titre, genere_le, styles, largeur_disponible=265 * mm):
@@ -196,24 +547,25 @@ def _entete_rapport_pdf(titre, sous_titre, genere_le, styles, largeur_disponible
         "RapportTitreApp",
         parent=styles["Title"],
         fontName="Helvetica-Bold",
-        fontSize=21,
-        leading=23,
-        textColor=_couleur(VERT_FONCE),
+        fontSize=22,
+        leading=24,
+        textColor=colors.white,
         spaceAfter=2,
     )
     sous_titre_style = ParagraphStyle(
         "RapportSousTitreApp",
         parent=styles["Normal"],
-        fontSize=9.5,
+        fontSize=9,
         leading=11,
-        textColor=_couleur(SLATE),
+        textColor=_couleur(VERT_DOUX),
     )
     meta_style = ParagraphStyle(
         "RapportMetaApp",
         parent=styles["Normal"],
-        fontSize=7.5,
-        leading=9,
-        textColor=_couleur(TEXTE_LEGER),
+        fontName="Helvetica-Bold",
+        fontSize=7.2,
+        leading=8.5,
+        textColor=colors.white,
         alignment=2,
     )
     bloc_titre = [
@@ -228,13 +580,13 @@ def _entete_rapport_pdf(titre, sous_titre, genere_le, styles, largeur_disponible
     tableau = Table(donnees, colWidths=[31 * mm, largeur_disponible - 74 * mm, 43 * mm])
     tableau.setStyle(
         TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
-            ("BOX", (0, 0), (-1, -1), 0.6, _couleur(BORDURE)),
-            ("LINEBEFORE", (0, 0), (0, -1), 4, _couleur(NAVY)),
-            ("LINEAFTER", (0, 0), (0, -1), 1.5, _couleur(ORANGE)),
+            ("BACKGROUND", (0, 0), (-1, -1), _couleur(VERT_FONCE)),
+            ("BACKGROUND", (0, 0), (0, -1), colors.white),
+            ("BACKGROUND", (2, 0), (2, -1), _couleur(ORANGE)),
+            ("LINEBELOW", (0, 0), (-1, -1), 2.2, _couleur(ORANGE)),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 10),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
             ("LEFTPADDING", (0, 0), (-1, -1), 12),
             ("RIGHTPADDING", (0, 0), (-1, -1), 12),
         ])
@@ -368,17 +720,17 @@ def _ecrire_infos_generales_excel(feuille, debut, fin, document, ligne=5, dernie
         feuille.row_dimensions[r].height = 24
 
 
-def _ecrire_kpis_excel(feuille, resume, ligne=10, cartes_par_ligne=4):
+def _ecrire_kpis_excel(feuille, resume, ligne=10, cartes_par_ligne=4, dernier_col=8, titre="Indicateurs clés"):
     kpis = _aplatir_resume(resume)
     if not kpis:
         return ligne
 
-    _ecrire_section_excel(feuille, ligne - 1, "Indicateurs clés", 8, ORANGE)
+    if titre:
+        _ecrire_section_excel(feuille, ligne - 1, titre, dernier_col, ORANGE)
     for index, (libelle, valeur) in enumerate(kpis):
         bloc_ligne = ligne + (index // cartes_par_ligne) * 4
         colonne = 1 + (index % cartes_par_ligne) * 2
-        accent = COULEURS_KPI[index % len(COULEURS_KPI)]
-        fond = FONDS_KPI[index % len(FONDS_KPI)]
+        accent, fond = _kpi_theme(libelle)
 
         for cellule in _cellules(feuille, bloc_ligne, bloc_ligne + 2, colonne, colonne + 1):
             cellule.fill = PatternFill("solid", fgColor="FFFFFF")
@@ -434,39 +786,76 @@ def _styliser_feuille_dossiers(feuille, largeurs, ligne_entete=1):
         cellule.alignment = centre
         cellule.border = bordure
 
+    # Couleur (accent, fond) par libellé de statut affiché
+    # (Agent.get_statut_display) : match exact, remplace l'ancien
+    # sous-marquage par sous-chaine qui laissait "En cours" sans couleur.
+    badges_statut = {
+        "Saisi": (SLATE, FOND_CLAIR),
+        "En cours": (ORANGE_FONCE, FOND_ORANGE),
+        "Clôturé": (VERT_FONCE, FOND_VERT),
+        "Clôturé (définitif)": (VERT_FONCE, FOND_VERT),
+        "Archivé": (TEXTE_LEGER, FOND_CLAIR),
+    }
+    colonne_statut = ENTETES.index("Statut") + 1 if "Statut" in ENTETES else None
+    colonne_hors_delai = ENTETES.index("Hors délai") + 1 if "Hors délai" in ENTETES else None
+    centre = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
     for r in range(ligne_entete + 1, feuille.max_row + 1):
         fond_ligne = PatternFill("solid", fgColor=FOND_CLAIR if r % 2 == 0 else "FFFFFF")
         for cellule in feuille[r]:
             cellule.fill = fond_ligne
             cellule.border = bordure
             cellule.alignment = Alignment(vertical="top", wrap_text=True)
-        feuille.cell(row=r, column=2).alignment = Alignment(horizontal="center", vertical="top")
-        feuille.cell(row=r, column=4).alignment = Alignment(horizontal="center", vertical="top")
-        feuille.cell(row=r, column=9).alignment = Alignment(horizontal="center", vertical="top")
-        feuille.cell(row=r, column=10).alignment = Alignment(horizontal="center", vertical="top")
-        if feuille.cell(row=r, column=10).value == "Oui":
-            cellule_retard = feuille.cell(row=r, column=10)
-            cellule_retard.fill = PatternFill("solid", fgColor=FOND_ROUGE)
-            cellule_retard.font = Font(bold=True, color=ROUGE)
+
+        if colonne_statut:
+            cellule_statut = feuille.cell(row=r, column=colonne_statut)
+            accent, fond = badges_statut.get(str(cellule_statut.value), (SLATE, FOND_CLAIR))
+            cellule_statut.font = Font(bold=True, size=9, color=accent)
+            cellule_statut.fill = PatternFill("solid", fgColor=fond)
+            cellule_statut.alignment = centre
+
+        if colonne_hors_delai:
+            cellule_retard = feuille.cell(row=r, column=colonne_hors_delai)
+            if cellule_retard.value == "Hors délai":
+                cellule_retard.font = Font(bold=True, size=9, color=ROUGE)
+                cellule_retard.fill = PatternFill("solid", fgColor=FOND_ROUGE)
+            else:
+                cellule_retard.font = Font(color=TEXTE_LEGER)
+            cellule_retard.alignment = centre
 
     for indice, largeur in enumerate(largeurs, start=1):
         feuille.column_dimensions[get_column_letter(indice)].width = largeur
     feuille.row_dimensions[ligne_entete].height = 28
-    feuille.freeze_panes = f"A{ligne_entete + 1}"
-    feuille.auto_filter.ref = (
-        f"A{ligne_entete}:{get_column_letter(len(largeurs))}{max(feuille.max_row, ligne_entete)}"
-    )
+    feuille.freeze_panes = f"B{ligne_entete + 1}"
+    reference = f"A{ligne_entete}:{get_column_letter(len(largeurs))}{max(feuille.max_row, ligne_entete)}"
+    feuille.auto_filter.ref = reference
+    _ajouter_table_excel(feuille, reference, "TableDossiers")
     feuille.page_setup.orientation = "landscape"
     feuille.page_setup.fitToWidth = 1
     feuille.page_setup.fitToHeight = 0
+    feuille.print_title_rows = f"{ligne_entete}:{ligne_entete}"
+
+
+def _ajouter_table_excel(feuille, reference, nom):
+    if feuille.max_row <= 1:
+        return
+    nom_table = nom
+    compteur = 1
+    while nom_table in feuille.tables:
+        compteur += 1
+        nom_table = f"{nom}{compteur}"
+    table = ExcelTable(displayName=nom_table, ref=reference)
+    table.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium4",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False,
+    )
+    feuille.add_table(table)
 
 
 def _cellule_sure(valeur):
-    """Neutralise une formule Excel sans abimer les « - » de remplissage.
-
-    Un caractere seul (« - ») ne peut pas former de formule : on ne prefixe
-    que les chaines qui pourraient reellement en etre une.
-    """
     if isinstance(valeur, str) and len(valeur) > 1:
         return neutralise_formule(valeur)
     return valeur
@@ -483,9 +872,6 @@ def _lignes(depannages):
         clotureurs = ", ".join(
             str(c.cloture_par) for c in depannage.clotures.all()
         )
-        # neutralise_formule : un numero de BT saisi « =HYPERLINK(...) » ou
-        # « =cmd|... » s executerait comme formule a l ouverture du classeur
-        # par le responsable (injection de formule).
         yield [
             _cellule_sure(valeur)
             for valeur in (
@@ -500,7 +886,7 @@ def _lignes(depannages):
                     f"{e.structure.code}/{e.libelle}" for e in depannage.equipements.all()
                 ),
                 _valeur_delai_jh(duree),
-                "Oui" if hors_delai else "Non",
+                "Hors délai" if hors_delai else "—",
                 str(depannage.cree_par),
                 clotureurs or "-",
             )
@@ -549,24 +935,69 @@ def exporter_excel(depannages, resume, debut, fin):
     return reponse
 
 
+def _entete_liste_dossiers_excel(feuille, sous_titre, debut, fin, dernier_col):
+    """En-tête sobre : logo sur fond blanc (pas de bandeau colore), titre de
+    l'application, sous-titre du document, et la periode dans un encart a
+    droite. Pas de bandeau d'indicateurs sous ce titre pour cet export."""
+    feuille.sheet_view.showGridLines = False
+    _ajouter_logo_excel(feuille, "A1")
+    feuille.column_dimensions["A"].width = 16
+    feuille.row_dimensions[1].height = 24
+    feuille.row_dimensions[2].height = 18
+    feuille.row_dimensions[3].height = 8
+
+    colonne_titre_fin = max(dernier_col - 3, 2)
+    feuille.merge_cells(start_row=1, start_column=2, end_row=1, end_column=colonne_titre_fin)
+    feuille.merge_cells(start_row=2, start_column=2, end_row=2, end_column=colonne_titre_fin)
+    feuille.cell(row=1, column=2, value="GESTION DES DÉPANNAGES")
+    feuille.cell(row=1, column=2).font = Font(bold=True, size=15, color=VERT_FONCE)
+    feuille.cell(row=2, column=2, value=sous_titre)
+    feuille.cell(row=2, column=2).font = Font(size=11, color=SLATE)
+    for r in (1, 2):
+        feuille.cell(row=r, column=2).alignment = Alignment(horizontal="left", vertical="center")
+
+    colonne_periode_debut = colonne_titre_fin + 1
+    feuille.merge_cells(
+        start_row=1, start_column=colonne_periode_debut, end_row=2, end_column=dernier_col
+    )
+    cellule_periode = feuille.cell(
+        row=1,
+        column=colonne_periode_debut,
+        value=f"Période : {debut:%d/%m/%Y} → {fin:%d/%m/%Y}",
+    )
+    cellule_periode.font = Font(bold=True, size=10, color=SLATE_DARK)
+    cellule_periode.alignment = Alignment(horizontal="center", vertical="center")
+    for cellule in _cellules(feuille, 1, 2, colonne_periode_debut, dernier_col):
+        cellule.fill = PatternFill("solid", fgColor=FOND_CLAIR)
+        cellule.border = _bordure_excel()
+
+    for cellule in _cellules(feuille, 3, 3, 1, dernier_col):
+        cellule.border = Border(bottom=Side(style="thin", color=BORDURE))
+
+    return 4
+
+
 def exporter_detail_dossiers_excel(depannages, debut, fin):
     """Classeur à une seule feuille : le détail des dossiers, sans la
     colonne Type (le bilan PDF ne détaille plus les dossiers un par un ;
-    ce fichier est le téléchargement dédié pour ce niveau de détail)."""
+    ce fichier est le téléchargement dédié pour ce niveau de détail).
+
+    Badges colorés Statut/Hors délai : même définition de « clôturé » que le
+    tableau de bord et le bilan (`statut`, pas `cloture_en_attente`) pour
+    rester cohérent entre les trois écrans.
+    """
     classeur = Workbook()
     feuille = classeur.active
     feuille.title = "Dossiers"
     feuille.sheet_properties.tabColor = BLEU
     dernier_col = len(ENTETES)
 
-    _styliser_bandeau_excel(
-        feuille,
-        "Détail des dossiers",
-        _periode_libelle(debut, fin),
-        dernier_col=dernier_col,
+    ligne_entete = _entete_liste_dossiers_excel(
+        feuille, "Liste des dépannages", debut, fin, dernier_col
     )
 
-    ligne_entete = 5
+    depannages = list(depannages)
+
     for colonne, valeur in enumerate(ENTETES, start=1):
         feuille.cell(row=ligne_entete, column=colonne, value=valeur)
 
@@ -660,125 +1091,255 @@ def exporter_pdf(
     resume, debut, fin, repartitions,
     secteurs_matrice=None, lignes_equipement=None,
 ):
-    """Bilan PDF paysage : page de garde, chiffres clés, tableau croisé
-    secteurs x équipements et répartitions (secteur/commune/quartier/
-    équipement) ; pagination (numéro de page) sur toutes les pages sauf la
-    couverture. Le détail dossier par dossier n'est plus dans ce bilan : il
-    se télécharge séparément en Excel (voir exporter_detail_dossiers_excel)."""
+    """Bilan PDF operationnel : page de garde puis trois pages (synthese,
+    analyse, matrice)."""
     reponse = HttpResponse(content_type="application/pdf")
     reponse["Content-Disposition"] = (
         f'attachment; filename="bilan_depannages_{_suffixe_nom_fichier(debut, fin)}.pdf"'
     )
 
-    largeur_page, hauteur_page = landscape(A4)
-    marge = 14 * mm
+    largeur_page, hauteur_page = A4
+    marge = 12 * mm
+    marge_bas = 20 * mm
+    largeur_contenu = largeur_page - 2 * marge
 
     document = BaseDocTemplate(
         reponse,
-        pagesize=landscape(A4),
-        leftMargin=marge, rightMargin=marge, topMargin=marge, bottomMargin=marge,
+        pagesize=A4,
+        leftMargin=marge, rightMargin=marge, topMargin=marge, bottomMargin=marge_bas,
         title="Bilan des dépannages",
     )
     cadre = Frame(
-        marge, marge, largeur_page - 2 * marge, hauteur_page - 2 * marge,
+        marge, marge_bas, largeur_page - 2 * marge, hauteur_page - marge - marge_bas,
         id="cadre",
     )
+    # Cadre pleine page pour la couverture : le contenu y est entierement
+    # dessine par `onPage`, ce cadre ne sert qu'a satisfaire BaseDocTemplate
+    # (une page a besoin d'au moins un frame).
+    cadre_couverture = Frame(0, 0, largeur_page, hauteur_page, id="cadre_couverture")
+
+    genere_le = timezone.localtime()
+
     document.addPageTemplates([
-        PageTemplate(id="couverture", frames=[cadre], onPage=_dessiner_couverture),
-        PageTemplate(id="contenu", frames=[cadre], onPage=_dessiner_pied_page),
+        PageTemplate(
+            id="couverture",
+            frames=[cadre_couverture],
+            onPage=partial(
+                _dessiner_couverture_rapport,
+                debut=debut,
+                fin=fin,
+                genere_le=genere_le,
+                resume=resume,
+            ),
+        ),
+        PageTemplate(id="rapport", frames=[cadre], onPage=_dessiner_pied_page_rapport),
     ])
 
-    styles = getSampleStyleSheet()
-    genere_le = timezone.localtime()
-    section_couverture = ParagraphStyle(
-        "SectionCouverture",
-        parent=styles["Heading2"],
-        fontName="Helvetica-Bold",
-        fontSize=11,
-        leading=14,
-        textColor=_couleur(VERT_FONCE),
-        spaceBefore=8,
-        spaceAfter=6,
-    )
-    section = ParagraphStyle(
-        "Section",
-        parent=styles["Heading2"],
-        fontName="Helvetica-Bold",
-        fontSize=12,
-        spaceBefore=12,
-        spaceAfter=6,
-        textColor=_couleur(VERT_FONCE),
-    )
-
-    # --- Page de garde : infos générales + KPI visibles dès la première page.
+    secteur_data = _trouver_repartition(repartitions, "secteur")
+    equipement_data = _trouver_repartition(repartitions, "quipement")
     elements = [
-        NextPageTemplate("contenu"),
-        _entete_rapport_pdf(
-            "Bilan des dépannages",
-            "Récapitulatif des dossiers, délais et répartitions",
+        NextPageTemplate("rapport"),
+        PageBreak(),
+        _EnteteOperationnellePdf(
+            "Analyse des dépannages",
+            "Répartitions et principaux indicateurs",
+            debut,
+            fin,
             genere_le,
-            styles,
+            largeur=largeur_contenu,
         ),
-        Spacer(1, 7 * mm),
-        Paragraph("Informations générales", section_couverture),
-        _tableau_infos_generales_pdf(debut, fin, genere_le, styles),
-        Spacer(1, 7 * mm),
-        Paragraph("Indicateurs clés", section_couverture),
-        _tableau_kpis_pdf(resume, styles),
+        Spacer(1, 5 * mm),
+        Table(
+            [[
+                _bloc_graphique_pdf("1. Répartition par secteur", secteur_data, getSampleStyleSheet(), largeur=88 * mm, limite=8),
+                _bloc_graphique_pdf("2. Équipements les plus concernés", equipement_data, getSampleStyleSheet(), largeur=88 * mm, limite=8),
+            ]],
+            colWidths=[91 * mm, 91 * mm],
+            hAlign="LEFT",
+            style=TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]),
+        ),
+        Spacer(1, 9 * mm),
+        Table(
+            [[_DonutTraitementPdf(resume, largeur=92 * mm)]],
+            colWidths=[largeur_contenu],
+            hAlign="LEFT",
+            style=TableStyle([
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]),
+        ),
     ]
+    elements.extend([
+        PageBreak(),
+        _EnteteOperationnellePdf(
+            "Matrice équipements × secteurs",
+            "Nombre de dossiers · Taux de traitement · Délai moyen",
+            debut,
+            fin,
+            genere_le,
+            largeur=largeur_contenu,
+        ),
+        Spacer(1, 5 * mm),
+    ])
 
-    contenu = []
-
-    # --- Tableau croisé secteurs x équipements (Créés / Taux / Délai) -------
     if secteurs_matrice and lignes_equipement:
-        contenu.append(Paragraph("Récapitulatif par secteur et équipement", section))
-        contenu.append(_tableau_croise_secteur_equipement(secteurs_matrice, lignes_equipement))
-
-    # --- Répartitions (secteur, commune, quartier, équipement) --------------
-    for nom_bloc, donnees in repartitions:
-        if not donnees:
-            continue
-        contenu.append(Paragraph(nom_bloc, section))
-        corps = [["Libellé", "Dossiers"]] + [[str(a), str(b)] for a, b in donnees]
-        tableau = Table(corps, colWidths=[120 * mm, 30 * mm], repeatRows=1)
-        tableau.setStyle(_style_tableau())
-        contenu.append(tableau)
-
-    if contenu:
-        elements.append(PageBreak())
-        elements.extend(contenu)
+        elements.append(
+            _tableau_croise_secteur_equipement(
+                secteurs_matrice,
+                lignes_equipement,
+                largeur_disponible=largeur_contenu,
+            )
+        )
+    else:
+        styles = getSampleStyleSheet()
+        vide = Paragraph(
+            "Aucune donnée de matrice disponible pour la période sélectionnée.",
+            ParagraphStyle(
+                "MatriceVide",
+                parent=styles["Normal"],
+                fontName="Helvetica-Bold",
+                fontSize=9,
+                leading=12,
+                textColor=_couleur(SLATE_DARK),
+            ),
+        )
+        tableau_vide = Table([[vide]], colWidths=[largeur_contenu], rowHeights=[28 * mm])
+        tableau_vide.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ("BOX", (0, 0), (-1, -1), 0.45, _couleur(BORDURE)),
+            ("LINEBEFORE", (0, 0), (0, -1), 2, _couleur(ORANGE)),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        elements.append(tableau_vide)
 
     document.build(elements)
     return reponse
 
 
-def _dessiner_couverture(canevas, document):
-    """Fond de page de garde, sans pagination."""
-    largeur_page, hauteur_page = landscape(A4)
+def _dessiner_kpi_couverture(canevas, x, y, largeur, hauteur, valeur, libelle, accent, code):
     canevas.saveState()
-    canevas.setFillColor(_couleur(FOND_PAGE))
+    canevas.setFillColor(colors.white)
+    canevas.setStrokeColor(_couleur(BORDURE))
+    canevas.setLineWidth(0.45)
+    canevas.roundRect(x, y, largeur, hauteur, 5, stroke=1, fill=1)
+    _rect_alpha(canevas, FOND_CLAIR, x, y, largeur, hauteur, 0.65, rayon=5)
+    canevas.setFillColor(_couleur(accent))
+    canevas.roundRect(x, y, 1.7 * mm, hauteur, 1.5, stroke=0, fill=1)
+    _rect_alpha(canevas, accent, x + largeur - 16 * mm, y + hauteur - 16 * mm, 11 * mm, 11 * mm, 0.09, rayon=6)
+    canevas.setFillColor(_couleur(accent))
+    canevas.setFont("Helvetica-Bold", 26)
+    canevas.drawString(x + 6 * mm, y + 11 * mm, str(valeur))
+    canevas.setFont("Helvetica-Bold", 8)
+    canevas.drawString(x + 6 * mm, y + 5 * mm, str(libelle).upper())
+    canevas.setFont("Helvetica-Bold", 8.5)
+    canevas.drawCentredString(x + largeur - 10.5 * mm, y + hauteur - 11.5 * mm, code)
+    canevas.setFillColor(_couleur(accent))
+    canevas.rect(x + 6 * mm, y + 2.2 * mm, 10 * mm, 0.55 * mm, stroke=0, fill=1)
+    canevas.restoreState()
+
+
+def _dessiner_couverture_rapport(canevas, document, debut, fin, genere_le, resume):
+    """Couverture executive : visuel pleine largeur, titre fort et KPIs."""
+    largeur_page, hauteur_page = A4
+    marge = 10 * mm
+    canevas.saveState()
+    canevas.setFillColor(_couleur(FOND_CLAIR))
     canevas.rect(0, 0, largeur_page, hauteur_page, stroke=0, fill=1)
 
-    canevas.setStrokeColor(_couleur("E2E9DF"))
-    canevas.setLineWidth(0.45)
-    canevas.setDash(2, 5)
-    for decalage in range(-40, 330, 34):
-        canevas.line(decalage * mm, 8 * mm, (decalage + 64) * mm, hauteur_page - 8 * mm)
-    canevas.setDash()
+    if ILLUSTRATION_COUVERTURE.exists():
+        largeur_image = largeur_page
+        hauteur_image = largeur_image * 1086 / 1448
+        canevas.drawImage(
+            str(ILLUSTRATION_COUVERTURE),
+            0,
+            87 * mm,
+            width=largeur_image,
+            height=hauteur_image,
+            preserveAspectRatio=True,
+            anchor="c",
+            mask="auto",
+        )
+        _rect_alpha(canevas, "FFFFFF", 0, 226 * mm, largeur_page, 72 * mm, 0.86)
 
-    canevas.setFillColor(_couleur(VERT))
-    canevas.roundRect(9 * mm, hauteur_page - 34 * mm, 3.2 * mm, 22 * mm, 1.6 * mm, stroke=0, fill=1)
+    if LOGO_CIE.exists():
+        logo = RLImage(str(LOGO_CIE), width=31 * mm, height=17 * mm)
+        logo.wrapOn(canevas, 31 * mm, 17 * mm)
+        logo.drawOn(canevas, marge, hauteur_page - 29 * mm)
+    canevas.setFillColor(_couleur(VERT_FONCE))
+    canevas.setFont("Helvetica-Bold", 11)
+    canevas.drawString(46 * mm, hauteur_page - 16 * mm, "COMPAGNIE IVOIRIENNE")
+    canevas.drawString(46 * mm, hauteur_page - 21 * mm, "D'ÉLECTRICITÉ")
+    x_meta = 130 * mm
+    canevas.setStrokeColor(_couleur(SLATE))
+    canevas.setLineWidth(0.7)
+    canevas.line(x_meta - 8 * mm, hauteur_page - 31 * mm, x_meta - 8 * mm, hauteur_page - 7 * mm)
+    canevas.setFont("Helvetica", 8.5)
+    canevas.setFillColor(_couleur(SLATE_DARK))
+    canevas.drawString(x_meta, hauteur_page - 13 * mm, f"Rapport généré le {genere_le:%d/%m/%Y à %H:%M}")
+    canevas.drawString(x_meta, hauteur_page - 20 * mm, f"Période : du {debut:%d/%m/%Y} au {fin:%d/%m/%Y}")
+
+    canevas.setFillColor(_couleur(VERT_FONCE))
+    canevas.setFont("Helvetica-Bold", 39)
+    canevas.drawString(marge, 212 * mm, "Bilan des")
     canevas.setFillColor(_couleur(ORANGE))
-    canevas.roundRect(9 * mm, hauteur_page - 43 * mm, 3.2 * mm, 8 * mm, 1.6 * mm, stroke=0, fill=1)
+    canevas.setFont("Helvetica-Bold", 41)
+    canevas.drawString(marge, 192 * mm, "dépannages")
+    canevas.setFillColor(_couleur(VERT_FONCE))
+    canevas.setFont("Helvetica", 22)
+    canevas.drawString(marge, 178 * mm, "Synthèse opérationnelle")
+    canevas.setFillColor(_couleur(ORANGE))
+    canevas.rect(marge, 168 * mm, 14 * mm, 0.8 * mm, stroke=0, fill=1)
 
-    canevas.setFillColor(_couleur(VERT_DOUX))
-    for x, y in [(242, 35), (262, 63), (224, 95), (271, 128)]:
-        canevas.circle(x * mm, y * mm, 2.2 * mm, stroke=0, fill=1)
-    canevas.setStrokeColor(_couleur(ORANGE))
-    canevas.setLineWidth(0.6)
-    canevas.line(242 * mm, 35 * mm, 262 * mm, 63 * mm)
-    canevas.line(262 * mm, 63 * mm, 224 * mm, 95 * mm)
-    canevas.line(224 * mm, 95 * mm, 271 * mm, 128 * mm)
+    total = _texte_kpi(resume, "depannage") or _texte_kpi(resume, "dossier") or "-"
+    a_cloturer = _texte_kpi(resume, "cloturer") or "-"
+    clotures = _texte_kpi(resume, "clotures") or _texte_kpi(resume, "traites") or "-"
+    hors_delai = _texte_kpi(resume, "hors") or "-"
+    definitifs = _texte_kpi(resume, "definit") or "-"
+    shuntes = _texte_kpi(resume, "shunt") or "-"
+    delai = _texte_kpi(resume, "delai") or "-"
+
+    y_kpi = 51 * mm
+    largeur_carte = 43 * mm
+    gouttiere = 5 * mm
+    _dessiner_kpi_couverture(canevas, marge, y_kpi, largeur_carte, 25 * mm, total, "Dépannages", VERT_FONCE, "BT")
+    _dessiner_kpi_couverture(canevas, marge + (largeur_carte + gouttiere), y_kpi, largeur_carte, 25 * mm, a_cloturer, "À clôturer", ORANGE, "AC")
+    _dessiner_kpi_couverture(canevas, marge + 2 * (largeur_carte + gouttiere), y_kpi, largeur_carte, 25 * mm, clotures, "Clôturés", VERT, "OK")
+    _dessiner_kpi_couverture(canevas, marge + 3 * (largeur_carte + gouttiere), y_kpi, largeur_carte, 25 * mm, hors_delai, "Hors délai", ORANGE, "H")
+
+    canevas.setStrokeColor(_couleur(BORDURE))
+    canevas.line(marge, 31 * mm, largeur_page - marge, 31 * mm)
+    mini_y = 20 * mm
+    donnees_bas = [("Définitifs", definitifs), ("Compteurs shuntés", shuntes), ("Délai moyen", delai)]
+    for index, (libelle, valeur) in enumerate(donnees_bas):
+        x = marge + index * 62 * mm
+        canevas.setFillColor(_couleur(FOND_VERT))
+        canevas.circle(x + 4 * mm, mini_y + 4 * mm, 4.5 * mm, stroke=0, fill=1)
+        canevas.setFillColor(_couleur(VERT_FONCE))
+        canevas.setFont("Helvetica-Bold", 6)
+        canevas.drawCentredString(x + 4 * mm, mini_y + 2.2 * mm, _kpi_code(libelle))
+        canevas.setFont("Helvetica", 7.2)
+        canevas.drawString(x + 12 * mm, mini_y + 5.3 * mm, libelle)
+        canevas.setFont("Helvetica-Bold", 15)
+        canevas.drawString(x + 12 * mm, mini_y - 0.4 * mm, str(valeur))
+        if index < 2:
+            canevas.setStrokeColor(_couleur(BORDURE))
+            canevas.line(x + 55 * mm, mini_y - 1 * mm, x + 55 * mm, mini_y + 10 * mm)
+
+    canevas.setFont("Helvetica", 7)
+    canevas.setFillColor(_couleur(SLATE_DARK))
+    canevas.drawString(marge, 4.6 * mm, "Gestion des dépannages  •  CIE")
+    canevas.drawRightString(largeur_page - marge, 4.6 * mm, "Page 1 / 3")
     canevas.restoreState()
 
 
@@ -805,6 +1366,23 @@ def _dessiner_pied_page(canevas, document):
     canevas.restoreState()
 
 
+def _dessiner_pied_page_rapport(canevas, document):
+    largeur_page, hauteur_page = A4
+    numero_page = canevas.getPageNumber()
+    canevas.saveState()
+    canevas.setFillColor(_couleur(FOND_PAGE))
+    canevas.rect(0, 0, largeur_page, hauteur_page, stroke=0, fill=1)
+    canevas.setStrokeColor(_couleur(BORDURE))
+    canevas.setLineWidth(0.8)
+    canevas.line(12 * mm, 14 * mm, largeur_page - 12 * mm, 14 * mm)
+    canevas.setFont("Helvetica", 6.5)
+    canevas.setFillColor(_couleur(SLATE_DARK))
+    canevas.drawString(12 * mm, 8 * mm, "Gestion des dépannages - CIE")
+    canevas.drawCentredString(largeur_page / 2, 8 * mm, f"Page {numero_page} / 3")
+    canevas.drawRightString(largeur_page - 12 * mm, 8 * mm, f"{timezone.localtime():%d/%m/%Y}")
+    canevas.restoreState()
+
+
 def _dessiner_page_resume(canevas, document):
     """Fond + pied de page du résumé portrait."""
     largeur_page, hauteur_page = A4
@@ -822,59 +1400,71 @@ def _dessiner_page_resume(canevas, document):
     canevas.restoreState()
 
 
-def _tableau_croise_secteur_equipement(secteurs, lignes_equipement):
-    """Tableau croisé équipement x secteur, 3 sous-lignes par équipement
-    (Créés / Taux Traitement / Délai), tel que demandé par la
-    direction : mêmes colonnes/lignes que le tableau de bord habituel."""
-    entete = ["Équipement", ""] + [s.libelle for s in secteurs]
+def _tableau_croise_secteur_equipement(secteurs, lignes_equipement, largeur_disponible=265 * mm):
+    """Matrice compacte : une ligne par equipement, une cellule par secteur."""
+    petit = ParagraphStyle(
+        "CelluleMatrice",
+        parent=getSampleStyleSheet()["Normal"],
+        fontSize=6.1,
+        leading=7.2,
+        alignment=1,
+        textColor=_couleur(SLATE_DARK),
+    )
+    equipement_style = ParagraphStyle(
+        "EquipementMatrice",
+        parent=getSampleStyleSheet()["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=6.7,
+        leading=7.8,
+        textColor=_couleur(VERT_FONCE),
+    )
+    entete = ["Equipement"] + [s.libelle for s in secteurs]
     corps = [entete]
-    fusions = []
-    ligne = 1
-    for item in lignes_equipement:
+    styles_cellules = []
+    for ligne_index, item in enumerate(lignes_equipement, start=1):
         libelle_equip = item["libelle"].split(" · ", 1)[-1]
-        corps.append([
-            libelle_equip, "Créés",
-            *[str(c["crees"]) for c in item["par_secteur"]],
-        ])
-        corps.append([
-            "", "Taux Traitement",
-            *[_valeur_pct(c["taux"]) for c in item["par_secteur"]],
-        ])
-        corps.append([
-            "", "Délai",
-            *[_valeur_delai_jh(c["delai_h"]) for c in item["par_secteur"]],
-        ])
-        fusions.append(("SPAN", (0, ligne), (0, ligne + 2)))
-        fusions.append(("LINEABOVE", (0, ligne), (-1, ligne), 0.6, _couleur("CBD5E1")))
-        ligne += 3
+        ligne = [Paragraph(_paragraphe(libelle_equip), equipement_style)]
+        for colonne_index, cellule in enumerate(item["par_secteur"], start=1):
+            crees = cellule["crees"]
+            if not crees:
+                ligne.append(Paragraph("-", petit))
+                styles_cellules.append(
+                    ("BACKGROUND", (colonne_index, ligne_index), (colonne_index, ligne_index), _couleur(FOND_CLAIR))
+                )
+                continue
+            taux = cellule["taux"]
+            delai = _valeur_delai_jh(cellule["delai_h"])
+            texte = f"<b>{crees}</b> - {_valeur_pct(taux)}<br/><font size='5.5' color='#{SLATE}'>{delai}</font>"
+            ligne.append(Paragraph(texte, petit))
+            fond = FOND_VERT if taux == 100 else FOND_ORANGE if taux and taux < 70 else FOND_CLAIR
+            styles_cellules.append(
+                ("BACKGROUND", (colonne_index, ligne_index), (colonne_index, ligne_index), _couleur(fond))
+            )
+        corps.append(ligne)
 
-    largeur_libelle = 32 * mm
-    largeur_indicateur = 26 * mm
-    largeur_dispo = 265 * mm - largeur_libelle - largeur_indicateur
+    largeur_libelle = 34 * mm
+    largeur_dispo = largeur_disponible - largeur_libelle
     largeur_secteur = largeur_dispo / max(len(secteurs), 1)
-    colonnes = [largeur_libelle, largeur_indicateur] + [largeur_secteur] * len(secteurs)
+    colonnes = [largeur_libelle] + [largeur_secteur] * len(secteurs)
 
     tableau = Table(corps, colWidths=colonnes, repeatRows=1)
     style = [
         ("BACKGROUND", (0, 0), (-1, 0), _couleur(NAVY)),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 6.6),
         ("LINEBELOW", (0, 0), (-1, 0), 1.2, _couleur(ORANGE)),
-        ("FONTSIZE", (0, 0), (-1, -1), 7.3),
-        ("ALIGN", (2, 0), (-1, -1), "CENTER"),
+        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("GRID", (0, 0), (-1, -1), 0.3, _couleur(BORDURE)),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.25, _couleur(BORDURE)),
+        ("LINEAFTER", (0, 0), (-1, -1), 0.2, _couleur(BORDURE)),
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
-        ("VALIGN", (0, 1), (0, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("ROWBACKGROUNDS", (0, 1), (0, -1), [colors.white, _couleur(FOND_CLAIR)]),
     ]
-    style.extend(fusions)
-    # Une bande grise tres claire sur la sous-ligne "Créés" de chaque groupe
-    # d equipement, pour scander visuellement les groupes de 3 lignes.
-    for i in range(1, len(corps), 3):
-        style.append(("BACKGROUND", (1, i), (-1, i), _couleur(FOND_CLAIR)))
+    style.extend(styles_cellules)
     tableau.setStyle(TableStyle(style))
     return tableau
 

@@ -632,9 +632,15 @@ def _matrice_secteur_equipement(depannages, secteurs):
     for d in depannages.filter(
         secteur__isnull=False
     ).select_related("secteur").prefetch_related("equipements__structure"):
-        # "Traité" = plus aucune structure en attente (pas est_ouvert, qui ne
-        # couvre que le provisoire).
-        ferme = not d.cloture_en_attente
+        # "Traité" = statut clôturé (pas est_ouvert, qui ne couvre que le
+        # provisoire). On se base sur `statut` plutôt que sur
+        # `cloture_en_attente` (qui dérive de ClotureStructure, structure par
+        # structure) : les deux sont censés être synchronisés par
+        # `cloturer_structure()`, mais `statut` est la source unique côté
+        # dossier — un import ou une correction en base qui ne passerait pas
+        # par ce chemin resterait cohérent avec ce rapport, et évite une
+        # requête ClotureStructure par dossier.
+        ferme = d.statut in (Statut.REGULARISE, Statut.CLOTURE)
         delai_heures = d.heures_ecoulees if (ferme and d.heures_ecoulees is not None) else None
 
         par_secteur[d.secteur_id]["crees"] += 1
@@ -751,7 +757,13 @@ def recapitulatif(request):
 
     total = depannages.count()
     definitifs = depannages.filter(type_intervention=TypeIntervention.DEFINITIF).count()
-    provisoires = total - definitifs
+    # "À clôturer" : dossiers de la période pas encore clôturés (statut).
+    # `type_intervention` reste PROVISOIRE à vie même après clôture (seul
+    # `statut` change à ce moment-là) — `total - definitifs` comptait donc à
+    # tort des dossiers déjà traités comme s'ils restaient à clôturer,
+    # d'où un chiffre différent (et supérieur) de celui du tableau de bord
+    # pour le même mot « à clôturer ».
+    provisoires = depannages.exclude(statut__in=[Statut.REGULARISE, Statut.CLOTURE]).count()
     shuntes = depannages.filter(
         categorie_provisoire=CategorieProvisoire.COMPTEUR_SHUNTE
     ).count()
@@ -759,8 +771,14 @@ def recapitulatif(request):
     # Une cloture compte dans la periode ou elle a ete faite, pas ou le
     # dossier a ete saisi : un dossier ouvert avant la periode et cloture
     # dedans doit remonter dans les cloturés de cette periode.
+    #
+    # Meme filtre que le tableau de bord (statut clôturé, sans restreindre au
+    # provisoire) : les deux pages affichent le même libellé « Dossiers
+    # clôturés » pour la même période, ils doivent donc donner le même
+    # nombre. Exclure les définitifs ici les faisait diverger (ex. 7 contre
+    # 16 sur le même mois).
     regularises_qs = Depannage.objects.pour_utilisateur(request.user).filter(
-        type_intervention=TypeIntervention.PROVISOIRE,
+        statut__in=[Statut.REGULARISE, Statut.CLOTURE],
         date_regularisation__gte=debut,
         date_regularisation__lte=fin,
     )
